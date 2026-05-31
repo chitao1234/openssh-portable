@@ -110,6 +110,7 @@ $(OPENBSD): ../config.h
 $(PORTS): ../config.h
 
 libopenbsd-compat.a:  $(COMPAT) $(OPENBSD) $(PORTS)
+	rm -f $@
 	$(AR) rv $@ $(COMPAT) $(OPENBSD) $(PORTS)
 	$(RANLIB) $@
 

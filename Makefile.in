@@ -291,6 +291,7 @@ win32compat:
 	fi
 
 libssh.a: $(LIBSSH_OBJS)
+	rm -f $@
 	$(AR) rv $@ $(LIBSSH_OBJS)
 	$(RANLIB) $@
 
@@ -343,6 +344,7 @@ logintest: logintest.o $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a loginrec.o
 # compile libssh objects with -fPIC for use in the sk_libfido2 shared library
 LIBSSH_PIC_OBJS=$(LIBSSH_OBJS:.o=.lo)
 libssh-pic.a: $(LIBSSH_PIC_OBJS)
+	rm -f $@
 	$(AR) rv $@ $(LIBSSH_PIC_OBJS)
 	$(RANLIB) $@
 
@@ -661,6 +663,7 @@ UNITTESTS_TEST_HELPER_OBJS=\
 	regress/unittests/test_helper/fuzz.o
 
 regress/unittests/test_helper/libtest_helper.a: ${UNITTESTS_TEST_HELPER_OBJS}
+	rm -f $@
 	$(AR) rv $@ $(UNITTESTS_TEST_HELPER_OBJS)
 	$(RANLIB) $@
 
