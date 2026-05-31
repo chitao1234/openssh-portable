@@ -570,6 +570,36 @@ w32_read(int fd, void *dst, size_t max)
 }
 
 ssize_t
+w32_readv(int fd, const struct iovec *iov, int iovcnt)
+{
+	ssize_t total = 0;
+	int i;
+
+	if (iov == NULL || iovcnt < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	CHECK_FD(fd);
+	for (i = 0; i < iovcnt; i++) {
+		ssize_t ret;
+
+		if (iov[i].iov_len == 0)
+			continue;
+
+		ret = w32_read(fd, iov[i].iov_base, iov[i].iov_len);
+		if (ret <= 0)
+			return total > 0 ? total : ret;
+
+		total += ret;
+		if ((size_t)ret < iov[i].iov_len)
+			break;
+	}
+
+	return total;
+}
+
+ssize_t
 w32_write(int fd, const void *buf, size_t max)
 {
 	CHECK_FD(fd);
@@ -583,17 +613,31 @@ w32_write(int fd, const void *buf, size_t max)
 ssize_t
 w32_writev(int fd, const struct iovec *iov, int iovcnt)
 {
-	ssize_t written = 0;
-	int i = 0;
+	ssize_t total = 0;
+	int i;
+
+	if (iov == NULL || iovcnt < 0) {
+		errno = EINVAL;
+		return -1;
+	}
 
 	CHECK_FD(fd);
 	for (i = 0; i < iovcnt; i++) {
-		ssize_t ret = w32_write(fd, iov[i].iov_base, iov[i].iov_len);
-		if (ret > 0)
-			written += ret;
+		ssize_t ret;
+
+		if (iov[i].iov_len == 0)
+			continue;
+
+		ret = w32_write(fd, iov[i].iov_base, iov[i].iov_len);
+		if (ret <= 0)
+			return total > 0 ? total : ret;
+
+		total += ret;
+		if ((size_t)ret < iov[i].iov_len)
+			break;
 	}
 
-	return written;
+	return total;
 }
 
 int

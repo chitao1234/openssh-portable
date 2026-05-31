@@ -5899,6 +5899,8 @@ case "$host" in
 	ac_cv_func_localtime_r=yes
 	ac_cv_search_nanosleep='none required'
 	ac_cv_func_utimes=yes
+	ac_cv_have_decl_readv=yes
+	ac_cv_have_decl_writev=yes
 	ac_cv_type_fsfilcnt_t=no
 	ac_cv_sizeof_short_int=2
 	ac_cv_sizeof_int=4

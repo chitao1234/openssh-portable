@@ -25,6 +25,9 @@ int w32_pipe(int *pfds);
 #define read w32_read
 ssize_t w32_read(int fd, void *dst, size_t max);
 
+#define readv w32_readv
+ssize_t w32_readv(int fd, const struct iovec *iov, int iovcnt);
+
 #define write w32_write
 ssize_t w32_write(int fd, const void *buf, size_t max);
 
