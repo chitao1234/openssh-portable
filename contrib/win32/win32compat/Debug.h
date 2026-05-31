@@ -1,5 +1,5 @@
 #pragma once
-#ifndef __attribute__
+#if !defined(__GNUC__) && !defined(__clang__) && !defined(__attribute__)
 #define __attribute__(A)
 #endif
 
