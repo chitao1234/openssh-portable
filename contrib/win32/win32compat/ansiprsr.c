@@ -42,7 +42,7 @@
 #define TS_SEND			  1
 
 /* items used from other modules */
-TelParams Parameters;
+extern TelParams Parameters;
 
 extern int ScreenX;
 extern int ScreenY;
