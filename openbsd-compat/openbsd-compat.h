@@ -82,7 +82,7 @@ int ftruncate(int filedes, off_t length);
 ssize_t getline(char **, size_t *, FILE *);
 #endif
 
-#ifndef HAVE_GETPAGESIZE
+#if defined(WINDOWS) || !defined(HAVE_GETPAGESIZE)
 int getpagesize(void);
 #endif
 
