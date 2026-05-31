@@ -1,12 +1,10 @@
 /* 
  * Windows version of sshpty* routines in sshpty.c
  */
+#include "includes.h"
 
-
-
-#include <windows.h>
 #include "../../../sshpty.h"
-#include "unistd.h"
+#include "misc.h"
 #include "misc_internal.h"
 
 /* 
@@ -70,4 +68,3 @@ void
 disconnect_controlling_tty(void) {
 	/* NO-OP */
 }
-
