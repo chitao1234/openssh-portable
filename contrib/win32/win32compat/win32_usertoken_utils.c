@@ -724,13 +724,15 @@ wchar_t* get_final_path_by_handle(HANDLE h)
 {
 	static wchar_t path_buf[PATH_MAX];
 
-	if (GetFinalPathNameByHandleW(h, path_buf, PATH_MAX, 0) == 0) {
+	if (pGetFinalPathNameByHandleW(h, path_buf, PATH_MAX, 0) == 0) {
 		errno = EOTHER;
 		debug3("failed to get final path of file with handle:%d error:%d", h, GetLastError());
 		return NULL;
 	}
 
-	return (path_buf + 4);
+	if (_wcsnicmp(path_buf, L"\\\\?\\", 4) == 0)
+		return (path_buf + 4);
+	return path_buf;
 }
 
 /* using the netbiosname\samaccountname as an input, lookup the upn for the user.

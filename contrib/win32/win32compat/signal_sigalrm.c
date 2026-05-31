@@ -32,6 +32,7 @@
 #include "inc\sys\time.h"
 #include "inc\signal.h"
 #include "debug.h"
+#include "w32api_proxies.h"
 
 struct _timer_info timer_info;
 extern sigset_t pending_signals;
@@ -71,11 +72,11 @@ w32_alarm(long long sec)
 
 	/* if timer was already ative, return when it was due */
 	if (timer_info.ticks_at_start) {
-		sec_passed = (GetTickCount64() - timer_info.ticks_at_start) / 1000;
+		sec_passed = (pGetTickCount64() - timer_info.ticks_at_start) / 1000;
 		if (sec_passed < (ULONGLONG)timer_info.run_time_sec)
 			ret = (int) (timer_info.run_time_sec - sec_passed);
 	}
-	timer_info.ticks_at_start = GetTickCount64();
+	timer_info.ticks_at_start = pGetTickCount64();
 	timer_info.run_time_sec = sec;
 	
 	return ret;

@@ -32,7 +32,6 @@
 #include <ws2tcpip.h>
 #include <mswsock.h>
 #include <errno.h>
-#include <VersionHelpers.h>
 #include <stddef.h>
 #include "w32fd.h"
 #include "inc\utf.h"
@@ -977,7 +976,7 @@ w32_gethostname(char *name_utf8, size_t len)
 {
 	char* tmp_name_utf8 = NULL;
 
-	if (IsWindows8OrGreater()) {
+	if (pIsWindows8OrGreater()) {
 		/* TODO - GetHostNameW not present in Win7, do GetProcAddr on Win8+*/
 	        /*
 		wchar_t name_utf16[256];

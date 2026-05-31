@@ -46,7 +46,8 @@ is_conpty_supported()
 		return isConpty;
 
 	isConpty = 0;
-	if ((hm_kernel32 = LoadLibraryExW(kernel32_dll_path, NULL, LOAD_LIBRARY_SEARCH_SYSTEM32)) == NULL) {
+	if ((hm_kernel32 = GetModuleHandleW(kernel32_dll_path)) == NULL &&
+	    (hm_kernel32 = LoadLibraryW(kernel32_dll_path)) == NULL) {
 		error("failed to load %S dll", kernel32_dll_path);
 		goto done;
 	}

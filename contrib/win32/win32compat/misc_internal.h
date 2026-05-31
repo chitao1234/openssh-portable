@@ -1,5 +1,6 @@
 #pragma once
-#include <VersionHelpers.h>
+
+#include "w32api_proxies.h"
 
 #define SSH_REGISTRY_ROOT L"SOFTWARE\\OpenSSH"
 #define GOTO_CLEANUP_IF(_cond_,_err_) do {  \
@@ -12,7 +13,7 @@
 #define NULL_DEVICE "/dev/null"
 #define NULL_DEVICE_WIN "NUL"
 
-#define IsWin7OrLess() (!IsWindows8OrGreater())
+#define IsWin7OrLess() (!pIsWindows8OrGreater())
 
 #define IS_INVALID_HANDLE(h) ( ((NULL == h) || (INVALID_HANDLE_VALUE == h)) ? 1 : 0 )
 #define IS_VALID_HANDLE(h) (!IS_INVALID_HANDLE(h))

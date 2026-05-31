@@ -54,6 +54,7 @@
 #include "misc_internal.h"
 #include "debug.h"
 #include "userenv.h"
+#include "w32api_proxies.h"
 
 /* internal table that stores the fd to w32_io mapping*/
 struct w32fd_table {
@@ -732,7 +733,7 @@ w32_fcntl(int fd, int cmd, ... /* arg */)
 int
 w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* exceptfds, const struct timeval *timeout)
 {
-	ULONGLONG ticks_start = GetTickCount64(), ticks_spent, timeout_ms = 0, time_rem = 0;
+	ULONGLONG ticks_start = pGetTickCount64(), ticks_spent, timeout_ms = 0, time_rem = 0;
 	w32_fd_set read_ready_fds, write_ready_fds;
 	HANDLE events[SELECT_EVENT_LIMIT];
 	int num_events = 0;
@@ -846,7 +847,7 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 	if ((timeout == NULL) || (timeout_ms != 0))
 		/* wait for io until any is ready */
 		while (out_ready_fds == 0) {
-			ticks_spent = GetTickCount64() - ticks_start;
+			ticks_spent = pGetTickCount64() - ticks_start;
 			time_rem = 0;
 
 			if (timeout != NULL) {

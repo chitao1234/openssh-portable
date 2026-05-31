@@ -38,6 +38,7 @@
 #include "servconf.h"
 #include "pal_doexec.h"
 #include "misc_internal.h"
+#include "w32api_proxies.h"
 #include "sshTelemetry.h"
 
 #ifndef SUBSYSTEM_NONE
@@ -103,11 +104,11 @@ wchar_t*
 get_registry_key_value(HKEY hKey, LPCWSTR lpSubKey, LPCWSTR lpValue, DWORD* required)
 {
 	wchar_t* data = NULL;
-	LSTATUS ret = RegGetValueW(hKey, lpSubKey, lpValue, RRF_RT_REG_SZ, NULL, NULL, required); /* RRF_RT_REG_SZ: automatically converts REG_EXPAND_SZ to REG_SZ. */
+	LSTATUS ret = pRegGetValueW(hKey, lpSubKey, lpValue, RRF_RT_REG_SZ, NULL, NULL, required); /* RRF_RT_REG_SZ: automatically converts REG_EXPAND_SZ to REG_SZ. */
 	if (ret == ERROR_SUCCESS) {
 		data = malloc(*required);
 		if (data) {
-			ret = RegGetValueW(hKey, lpSubKey, lpValue, RRF_RT_REG_SZ, NULL, (LPBYTE)data, required);
+			ret = pRegGetValueW(hKey, lpSubKey, lpValue, RRF_RT_REG_SZ, NULL, (LPBYTE)data, required);
 		}
 	}
 	if (ret != ERROR_SUCCESS) {

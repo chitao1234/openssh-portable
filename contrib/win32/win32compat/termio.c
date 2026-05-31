@@ -47,6 +47,7 @@
 #include "debug.h"
 #include "tnnet.h"
 #include "misc_internal.h"
+#include "w32api_proxies.h"
 
 extern int in_raw_mode;
 BOOL isFirstTime = TRUE;
@@ -277,7 +278,7 @@ syncio_close(struct w32_io* pio)
 		SleepEx(0, TRUE);
 	}
 
-	CancelIoEx(WINHANDLE(pio), NULL);
+	pCancelIoEx(WINHANDLE(pio), NULL);
 
 	/* If io is pending, let worker threads exit. */
 	if (pio->read_details.pending) {
@@ -288,7 +289,7 @@ syncio_close(struct w32_io* pio)
 		*/
 		if (FILETYPE(pio) == FILE_TYPE_CHAR && (IsWin7OrLess() || in_raw_mode)) {
 			QueueUserAPC(InterruptThread, pio->read_overlapped.hEvent, (ULONG_PTR)NULL);
-			CancelSynchronousIo(pio->read_overlapped.hEvent);
+			pCancelSynchronousIo(pio->read_overlapped.hEvent);
 		}
 
 		// give the read thread some time to wind down, but don't block syncio_close
