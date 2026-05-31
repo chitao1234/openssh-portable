@@ -50,6 +50,9 @@
 #include "authfile.h"
 #include "match.h"
 #include "ssherr.h"
+#ifdef WINDOWS
+# include "sshfileperm.h"
+#endif
 
 int
 auth_authorise_keyopts(struct passwd *pw, struct sshauthopt *opts,
@@ -521,4 +524,3 @@ auth_openprincipals(const char *file, struct passwd *pw, int strict_modes)
 	return auth_openfile(file, pw, strict_modes, 0,
 	    "authorized principals");
 }
-

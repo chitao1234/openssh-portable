@@ -78,6 +78,9 @@
 #include "sshbuf.h"
 #include "ssherr.h"
 #include "platform.h"
+#ifdef WINDOWS
+# include "sshfileperm.h"
+#endif
 
 /* remove newline at end of string */
 char *

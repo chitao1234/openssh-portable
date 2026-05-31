@@ -111,6 +111,11 @@ int	 lib_contains_symbol(const char *, const char *);
 
 void	 sock_set_v6only(int);
 
+#ifdef WINDOWS
+void	 convertToForwardslash(char *);
+int	 is_absolute_path(const char *);
+#endif
+
 struct passwd *pwcopy(struct passwd *);
 const char *ssh_gai_strerror(int);
 

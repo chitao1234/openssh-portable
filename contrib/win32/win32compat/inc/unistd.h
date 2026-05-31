@@ -94,6 +94,14 @@ int w32_readlink(const char *path, char *link, int linklen);
 int w32_link(const char *oldpath, const char *newpath);
 #define link w32_link
 
+int fork(void);
+int getpid(void);
+int execv(const char *path, char *const argv[]);
+int execve(const char *path, char *const argv[], char *const envp[]);
+int execl(const char *path, const char *arg, ...);
+int execlp(const char *file, const char *arg, ...);
+int initgroups(const char *user, gid_t group);
+
 int getpeereid(int, uid_t*, gid_t*);
 
 int daemon(int nochdir, int noclose);
