@@ -44,8 +44,8 @@
 /* #define DEBUG_SK 1 */
 
 #ifdef WINDOWS
-extern HANDLE sshagent_client_primary_token = NULL;
-extern char *sshagent_con_username = NULL;
+extern HANDLE sshagent_client_primary_token;
+extern char *sshagent_con_username;
 static char module_path[PATH_MAX + 1];
 
 static char *
