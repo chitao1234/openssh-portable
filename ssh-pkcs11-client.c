@@ -31,6 +31,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <limits.h>
+#include <stdlib.h>
 
 #include <openssl/ecdsa.h>
 #include <openssl/rsa.h>

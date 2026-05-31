@@ -37,6 +37,7 @@
 #include <lm.h>
 #include <sddl.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "utf.h"
 #include "misc_internal.h"

@@ -40,6 +40,7 @@
 #include "sys/un.h"
 #include "utf.h"
 #include "stdio.h"
+#include <stdlib.h>
 
 #include "w32fd.h"
 #include "signal_internal.h"

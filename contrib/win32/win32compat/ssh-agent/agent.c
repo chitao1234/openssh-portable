@@ -30,6 +30,7 @@
  */
 #include "config.h"
 #include "agent.h"
+#include <stdlib.h>
 #include <sddl.h>
 #include <userenv.h>
 #include "../misc_internal.h"

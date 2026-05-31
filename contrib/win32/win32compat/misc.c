@@ -35,6 +35,7 @@
 #define SECURITY_WIN32
 #include <windows.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include <shlwapi.h>
 #include <conio.h>
@@ -135,6 +136,135 @@ char* chroot_path = NULL;
 int chroot_path_len = 0;
 /* UTF-16 version of the above */
 wchar_t* chroot_pathw = NULL;
+
+errno_t
+w32_dupenv_s(char **buffer, size_t *number_of_elements, const char *varname)
+{
+	DWORD copied, needed;
+	char *value;
+
+	if (buffer == NULL || varname == NULL)
+		return EINVAL;
+
+	*buffer = NULL;
+	if (number_of_elements != NULL)
+		*number_of_elements = 0;
+
+	for (;;) {
+		SetLastError(ERROR_SUCCESS);
+		needed = GetEnvironmentVariableA(varname, NULL, 0);
+		if (needed == 0) {
+			DWORD err = GetLastError();
+
+			if (err == ERROR_ENVVAR_NOT_FOUND)
+				return 0;
+			if (err != ERROR_SUCCESS)
+				return errno_from_Win32Error(err);
+			needed = 1;
+		}
+
+		if ((value = malloc(needed * sizeof(*value))) == NULL)
+			return ENOMEM;
+
+		SetLastError(ERROR_SUCCESS);
+		copied = GetEnvironmentVariableA(varname, value, needed);
+		if (copied < needed) {
+			DWORD err = GetLastError();
+
+			if (copied == 0 && err == ERROR_ENVVAR_NOT_FOUND) {
+				free(value);
+				return 0;
+			}
+			if (copied == 0)
+				value[0] = '\0';
+
+			*buffer = value;
+			if (number_of_elements != NULL)
+				*number_of_elements = (size_t)copied + 1;
+			return 0;
+		}
+
+		free(value);
+		needed = copied + 1;
+	}
+}
+
+errno_t
+w32_wdupenv_s(wchar_t **buffer, size_t *number_of_elements,
+    const wchar_t *varname)
+{
+	DWORD copied, needed;
+	wchar_t *value;
+
+	if (buffer == NULL || varname == NULL)
+		return EINVAL;
+
+	*buffer = NULL;
+	if (number_of_elements != NULL)
+		*number_of_elements = 0;
+
+	for (;;) {
+		SetLastError(ERROR_SUCCESS);
+		needed = GetEnvironmentVariableW(varname, NULL, 0);
+		if (needed == 0) {
+			DWORD err = GetLastError();
+
+			if (err == ERROR_ENVVAR_NOT_FOUND)
+				return 0;
+			if (err != ERROR_SUCCESS)
+				return errno_from_Win32Error(err);
+			needed = 1;
+		}
+
+		if ((value = malloc(needed * sizeof(*value))) == NULL)
+			return ENOMEM;
+
+		SetLastError(ERROR_SUCCESS);
+		copied = GetEnvironmentVariableW(varname, value, needed);
+		if (copied < needed) {
+			DWORD err = GetLastError();
+
+			if (copied == 0 && err == ERROR_ENVVAR_NOT_FOUND) {
+				free(value);
+				return 0;
+			}
+			if (copied == 0)
+				value[0] = L'\0';
+
+			*buffer = value;
+			if (number_of_elements != NULL)
+				*number_of_elements = (size_t)copied + 1;
+			return 0;
+		}
+
+		free(value);
+		needed = copied + 1;
+	}
+}
+
+errno_t
+w32_get_wpgmptr(wchar_t **value)
+{
+	static wchar_t module_path[PATH_MAX + 1];
+	DWORD len;
+
+	if (value == NULL)
+		return EINVAL;
+
+	if (module_path[0] == L'\0') {
+		SetLastError(ERROR_SUCCESS);
+		len = GetModuleFileNameW(NULL, module_path, ARRAYSIZE(module_path));
+		if (len == 0)
+			return errno_from_Win32LastError();
+		if (len >= ARRAYSIZE(module_path)) {
+			module_path[0] = L'\0';
+			return ENAMETOOLONG;
+		}
+	}
+
+	*value = module_path;
+	return 0;
+}
 
 int
 usleep(unsigned int useconds)
