@@ -5877,6 +5877,7 @@ case "$host" in
 	ac_cv_func_getgrouplist=yes
 	ac_cv_func_getnameinfo=yes
 	ac_cv_func_group_from_gid=yes
+	ac_cv_func_user_from_uid=yes
 	ac_cv_func_fstatvfs=yes
 	ac_cv_func_explicit_bzero=yes
 	ac_cv_func_realpath=yes
