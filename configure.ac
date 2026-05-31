@@ -147,6 +147,7 @@ case "$host" in
 	ac_cv_func_unsetenv=no
 	ac_cv_search_getrrsetbyname='none required'
 	ac_cv_libc_defines___progname=yes
+	AC_DEFINE([DISABLE_UTMPX], [1], [Disable utmpx])
 	ac_cv_have_sa_family_t=no
 	ac_cv_have_struct_in6_addr=yes
 	ac_cv_have_struct_sockaddr_in6=yes
