@@ -5878,18 +5878,27 @@ case "$host" in
 	ac_cv_func_getnameinfo=yes
 	ac_cv_func_group_from_gid=yes
 	ac_cv_func_fstatvfs=yes
+	ac_cv_func_explicit_bzero=yes
 	ac_cv_func_realpath=yes
+	ac_cv_func_setenv=yes
 	ac_cv_func_statvfs=yes
+	ac_cv_func_strsignal=yes
 	ac_cv_func_strmode=yes
 	ac_cv_func_tcgetpgrp=yes
 	ac_cv_func_waitpid=yes
+	ac_cv_func_unsetenv=no
 	ac_cv_search_getrrsetbyname='none required'
+	ac_cv_libc_defines___progname=yes
 	ac_cv_have_sa_family_t=no
 	ac_cv_have_struct_in6_addr=yes
 	ac_cv_have_struct_sockaddr_in6=yes
 	ac_cv_member_struct_pollfd_fd=yes
 	ac_cv_member_struct_sockaddr_in6_sin6_scope_id=yes
 	ac_cv_type_fsblkcnt_t=no
+	ac_cv_func_innetgr=yes
+	ac_cv_func_localtime_r=yes
+	ac_cv_search_nanosleep='none required'
+	ac_cv_func_utimes=yes
 	ac_cv_type_fsfilcnt_t=no
 	ac_cv_sizeof_short_int=2
 	ac_cv_sizeof_int=4
@@ -27958,3 +27967,4 @@ if test "$AUDIT_MODULE" = "bsm" ; then
 	echo "WARNING: BSM audit support is currently considered EXPERIMENTAL."
 	echo "See the Solaris section in README.platform for details."
 fi
+
