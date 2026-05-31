@@ -28,9 +28,9 @@
 * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <Windows.h>
-#include "inc\utf.h"
-#include "Debug.h"
+#include <windows.h>
+#include "utf.h"
+#include "debug.h"
 
 /*on error returns NULL and sets errno*/
 wchar_t *

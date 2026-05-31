@@ -34,21 +34,21 @@
 
 #define UMDF_USING_NTSTATUS 
 #define SECURITY_WIN32
-#include <Windows.h>
-#include <LM.h>
-#include <Sddl.h>
-#include <Aclapi.h>
-#include <Ntsecapi.h>
+#include <windows.h>
+#include <lm.h>
+#include <sddl.h>
+#include <aclapi.h>
+#include <ntsecapi.h>
 #include <security.h>
 #include <ntstatus.h>
 #include <stdio.h>
 
 #define __attribute__(a)
-#include "inc/sys/types.h"
-#include "..\..\..\xmalloc.h"
-#include "..\..\..\groupaccess.h"
-#include "..\..\..\match.h"
-#include "..\..\..\log.h"
+#include "sys/types.h"
+#include "../../../xmalloc.h"
+#include "../../../groupaccess.h"
+#include "../../../match.h"
+#include "../../../log.h"
 
 #include "misc_internal.h"
 

@@ -12,8 +12,8 @@
 
 #include "includes.h"
 #ifdef WINDOWS
-#include <LM.h>
-#include <Sddl.h>
+#include <lm.h>
+#include <sddl.h>
 #endif // WINDOWS
 
 #include <sys/types.h>

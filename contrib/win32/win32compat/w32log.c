@@ -27,15 +27,15 @@
 * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <Windows.h>
+#include <windows.h>
 #include <io.h>
 #include <fcntl.h>
 #include <stdio.h>
-#include "inc/sys/stat.h"
+#include "sys/stat.h"
 
-#include "inc\syslog.h"
+#include "syslog.h"
 #include "misc_internal.h"
-#include "inc\utf.h"
+#include "utf.h"
 #include "openssh-events.h"
 
 #define MSGBUFSIZ 1024

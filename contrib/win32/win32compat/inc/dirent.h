@@ -7,10 +7,10 @@
 #ifndef __DIRENT_H__
 #define __DIRENT_H__
 
-#include <direct.h>
+#include "direct.h"
 #include <io.h>
 #include <fcntl.h>
-#include "..\misc_internal.h"
+#include "../misc_internal.h"
 
 struct dirent {
 	int            d_ino;       /* Inode number */

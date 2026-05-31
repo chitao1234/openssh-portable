@@ -33,34 +33,34 @@
 
 #define UMDF_USING_NTSTATUS 
 #define SECURITY_WIN32
-#include <Windows.h>
+#include <windows.h>
 #include <stdio.h>
 #include <time.h>
-#include <Shlwapi.h>
+#include <shlwapi.h>
 #include <conio.h>
-#include <LM.h>
-#include <Sddl.h>
-#include <Aclapi.h>
+#include <lm.h>
+#include <sddl.h>
+#include <aclapi.h>
 #include <security.h>
 #include <ntstatus.h>
 #include <malloc.h>
 
-#include "inc\unistd.h"
-#include "inc\sys\stat.h"
-#include "inc\sys\statvfs.h"
-#include "inc\sys\time.h"
+#include "unistd.h"
+#include "sys/stat.h"
+#include "sys/statvfs.h"
+#include "sys/time.h"
 #include "misc_internal.h"
-#include "inc\dlfcn.h"
-#include "inc\dirent.h"
-#include "inc\sys\types.h"
-#include "inc\sys\ioctl.h"
-#include "inc\fcntl.h"
-#include "inc\utf.h"
+#include "dlfcn.h"
+#include "dirent.h"
+#include "sys/types.h"
+#include "sys/ioctl.h"
+#include "fcntl.h"
+#include "utf.h"
 #include "debug.h"
 #include "w32fd.h"
-#include "inc\string.h"
-#include "inc\time.h"
-#include "..\..\..\sshfileperm.h"
+#include "string.h"
+#include "time.h"
+#include "../../../sshfileperm.h"
 
 #include <wchar.h>
 
@@ -510,7 +510,7 @@ w32_ioctl(int d, int request, ...)
 
 /* p should be at least 12 bytes long*/
 void
-strmode(mode_t mode, char *p)
+strmode(int mode, char *p)
 {
 	/* print type */
 	switch (mode & S_IFMT) {
@@ -623,7 +623,7 @@ is_root_or_empty(wchar_t * path)
 	if (!path) 
 		return FALSE;
 	len = (int)wcslen(path);
-	if((len > 1) && __ascii_iswalpha(path[0]) && path[1] == L':')
+	if ((len > 1) && iswalpha(path[0]) && path[1] == L':')
 		path_start = path + 2;
 	else
 		path_start = path;
@@ -2148,4 +2148,3 @@ strrstr(const char *inStr, const char *pattern)
 
 	return last;
 }
-

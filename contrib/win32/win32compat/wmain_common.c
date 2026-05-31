@@ -30,10 +30,10 @@
 * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <Windows.h>
-#include "inc\utf.h"
+#include <windows.h>
+#include "utf.h"
 #include "misc_internal.h"
-#include "Debug.h"
+#include "debug.h"
 
 int
 main(int, char **);

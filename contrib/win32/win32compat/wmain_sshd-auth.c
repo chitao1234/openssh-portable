@@ -32,15 +32,15 @@
 
 /* disable inclusion of compatability defitnitions in CRT headers */
 #define __STDC__ 1
-#include <Windows.h>
+#include <windows.h>
 #include <wchar.h>
-#include <Lm.h>
+#include <lm.h>
 #include <sddl.h>
 #include <stdio.h>
 
-#include "inc\utf.h"
+#include "utf.h"
 #include "misc_internal.h"
-#include "Debug.h"
+#include "debug.h"
 
 int main(int, char **);
 extern HANDLE main_thread;

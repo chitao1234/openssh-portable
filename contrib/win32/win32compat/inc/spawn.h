@@ -4,7 +4,7 @@
 * Declarations of POSIX spawn family of functions
 */
 #pragma once
-#include "sys\types.h"
+#include "sys/types.h"
 
 #define POSIX_SPAWN_RESETIDS			0x1
 #define POSIX_SPAWN_SETPGROUP			0x2

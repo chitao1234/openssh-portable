@@ -689,6 +689,9 @@ LIBEDIT
 LDNSCONFIG
 LIBOBJS
 LD
+WIN32COMPAT_MAKE_CPPFLAGS
+WIN32COMPAT_CPPFLAGS
+LIBWIN32COMPAT
 PATH_PASSWD_PROG
 STARTUP_SCRIPT_SHELL
 MAKE_PACKAGE_SUPPORTED
@@ -5839,6 +5842,48 @@ if test ! -z "$PATH_PASSWD_PROG" ; then
 printf "%s\n" "#define _PATH_PASSWD_PROG \"$PATH_PASSWD_PROG\"" >>confdefs.h
 
 fi
+
+LIBWIN32COMPAT=
+WIN32COMPAT_CPPFLAGS=
+WIN32COMPAT_MAKE_CPPFLAGS=
+
+
+
+
+case "$host" in
+*-*-mingw*)
+	LIBWIN32COMPAT="libwin32compat.a"
+	WIN32COMPAT_CPPFLAGS="-DWIN32 -DWINDOWS -D_WINDOWS -D_CRT_DECLARE_NONSTDC_NAMES=0 -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS -D_WINSOCK_DEPRECATED_NO_WARNINGS -D_WIN32_WINNT=0x0501 -DGSSAPI=1 -DGSSAPI_SSPI=1 -DHAVE_GSSAPI_H=1"
+	WIN32COMPAT_MAKE_CPPFLAGS="-I\$(top_srcdir)/contrib/win32/win32compat/inc"
+	CPPFLAGS="-I${srcdir}/contrib/win32/win32compat/inc $CPPFLAGS"
+	LIBS="$LIBS -lws2_32 -lnetapi32 -lsecur32 -luserenv -lshlwapi -ladvapi32 -lshell32 -lole32 -lcrypt32 -lrpcrt4"
+
+	# Seed MinGW results for wrapper-backed headers and cross-size probes.
+	ac_cv_header_netdb_h=yes
+	ac_cv_header_poll_h=yes
+	ac_cv_header_sys_select_h=yes
+	ac_cv_func_freeaddrinfo=yes
+	ac_cv_func_gai_strerror=yes
+	ac_cv_func_getaddrinfo=yes
+	ac_cv_func_getnameinfo=yes
+	ac_cv_func_fstatvfs=yes
+	ac_cv_func_realpath=yes
+	ac_cv_func_statvfs=yes
+	ac_cv_func_strmode=yes
+	ac_cv_have_sa_family_t=no
+	ac_cv_have_struct_in6_addr=yes
+	ac_cv_have_struct_sockaddr_in6=yes
+	ac_cv_member_struct_pollfd_fd=yes
+	ac_cv_member_struct_sockaddr_in6_sin6_scope_id=yes
+	ac_cv_type_fsblkcnt_t=no
+	ac_cv_type_fsfilcnt_t=no
+	ac_cv_sizeof_short_int=2
+	ac_cv_sizeof_int=4
+	ac_cv_sizeof_long_int=4
+	ac_cv_sizeof_long_long_int=8
+	ac_cv_sizeof_time_t=8
+	;;
+esac
 
 LD="$CC"
 
@@ -12034,6 +12079,11 @@ fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
 }
 	SHLIBEXT=".dll"
+	;;
+*-*-mingw*)
+
+printf "%s\n" "#define WINDOWS 1" >>confdefs.h
+
 	;;
 *-*-dgux*)
 
@@ -26500,7 +26550,15 @@ CFLAGS_NOPIE=`echo "$CFLAGS" | sed 's/^-fPIE //;s/ -fPIE//g'`
 
 
 
-ac_config_files="$ac_config_files Makefile buildpkg.sh opensshd.init openssh.xml openbsd-compat/Makefile openbsd-compat/regress/Makefile survey.sh"
+files="Makefile buildpkg.sh opensshd.init openssh.xml \
+	openbsd-compat/Makefile openbsd-compat/regress/Makefile \
+	survey.sh"
+case "$host" in
+*-*-mingw*)
+	files="$files contrib/win32/win32compat/Makefile"
+	;;
+esac
+ac_config_files="$ac_config_files $files"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -27191,13 +27249,7 @@ for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
     "config.h") CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
-    "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
-    "buildpkg.sh") CONFIG_FILES="$CONFIG_FILES buildpkg.sh" ;;
-    "opensshd.init") CONFIG_FILES="$CONFIG_FILES opensshd.init" ;;
-    "openssh.xml") CONFIG_FILES="$CONFIG_FILES openssh.xml" ;;
-    "openbsd-compat/Makefile") CONFIG_FILES="$CONFIG_FILES openbsd-compat/Makefile" ;;
-    "openbsd-compat/regress/Makefile") CONFIG_FILES="$CONFIG_FILES openbsd-compat/regress/Makefile" ;;
-    "survey.sh") CONFIG_FILES="$CONFIG_FILES survey.sh" ;;
+    "$files") CONFIG_FILES="$CONFIG_FILES $files" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

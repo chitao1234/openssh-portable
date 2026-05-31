@@ -32,15 +32,15 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <Windows.h>
-#include <Strsafe.h>
+#include <windows.h>
+#include <strsafe.h>
 #include <stdio.h>
 #include <io.h>
-#include <Shlobj.h>
-#include <Sddl.h>
+#include <shlobj.h>
+#include <sddl.h>
 #include <process.h>
 #include "misc_internal.h"
-#include "inc\utf.h"
+#include "utf.h"
 
 #define MAX_CONSOLE_COLUMNS 9999
 #define MAX_CONSOLE_ROWS 9999

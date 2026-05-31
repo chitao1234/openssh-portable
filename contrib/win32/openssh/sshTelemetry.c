@@ -36,10 +36,10 @@ GitHub releases will not send any Telemetry.
 
 #include <string.h>
 #include <stdio.h>
-#include <Objbase.h>
+#include <objbase.h>
 
-#include "sshTelemetry.h"
-#include "sshTelemetryInternal.h"
+#include "sshtelemetry.h"
+#include "sshtelemetryinternal.h"
 
 // {0d986661-0dd7-561a-b15b-fcc1cd46d2bb}
 TRACELOGGING_DEFINE_PROVIDER(

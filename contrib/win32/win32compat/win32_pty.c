@@ -25,13 +25,13 @@
 * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <Windows.h>
+#include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "Debug.h"
-#include "inc\fcntl.h"
-#include "inc\utf.h"
+#include "debug.h"
+#include "fcntl.h"
+#include "utf.h"
 #include "misc_internal.h"
 #include "signal_internal.h"
 

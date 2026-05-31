@@ -7,10 +7,10 @@
 
 #pragma once
 
-#include <Windows.h>
+#include <windows.h>
 #define SECURITY_WIN32
 #include <security.h>
-#include <Ntsecapi.h>
+#include <ntsecapi.h>
 
 BOOL pLogonUserExExW(wchar_t *, wchar_t *, wchar_t *, DWORD, DWORD, PTOKEN_GROUPS, PHANDLE, PSID *, PVOID *, LPDWORD, PQUOTA_LIMITS);
 BOOLEAN pTranslateNameW(LPCWSTR, EXTENDED_NAME_FORMAT, EXTENDED_NAME_FORMAT, LPWSTR, PULONG);
@@ -22,10 +22,10 @@ NTSTATUS pLsaClose(LSA_HANDLE);
 NTSTATUS pLsaRemoveAccountRights(LSA_HANDLE, PSID, BOOLEAN, PLSA_UNICODE_STRING, ULONG);
 BOOL pCancelIoEx(HANDLE, LPOVERLAPPED);
 BOOL pCancelSynchronousIo(HANDLE);
+BOOLEAN pCreateSymbolicLinkW(LPCWSTR, LPCWSTR, DWORD);
 DWORD pGetFinalPathNameByHandleW(HANDLE, LPWSTR, DWORD, DWORD);
 ULONGLONG pGetTickCount64(void);
 BOOL pIsWindowsVistaOrGreater(void);
 BOOL pIsWindows8OrGreater(void);
 LSTATUS pRegGetValueW(HKEY, LPCWSTR, LPCWSTR, DWORD, LPDWORD, PVOID, LPDWORD);
-
 

@@ -59,7 +59,7 @@
 #include "digest.h"
 #include "kex.h"
 #ifdef WINDOWS
-#include "sshTelemetry.h"
+#include "sshtelemetry.h"
 #endif
 
 /* import */

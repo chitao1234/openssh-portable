@@ -356,6 +356,27 @@ pCancelSynchronousIo(HANDLE handle)
 	return FALSE;
 }
 
+BOOLEAN
+pCreateSymbolicLinkW(LPCWSTR symlink_file_name, LPCWSTR target_file_name, DWORD flags)
+{
+	typedef BOOLEAN (WINAPI *CreateSymbolicLinkWType)(LPCWSTR, LPCWSTR, DWORD);
+	static CreateSymbolicLinkWType s_pCreateSymbolicLinkW = NULL;
+	static int s_init = 0;
+	HMODULE hm = NULL;
+
+	if (!s_init) {
+		s_init = 1;
+		if ((hm = load_kernel32()) != NULL)
+			s_pCreateSymbolicLinkW = (CreateSymbolicLinkWType)get_proc_address(hm, "CreateSymbolicLinkW");
+	}
+
+	if (s_pCreateSymbolicLinkW != NULL)
+		return s_pCreateSymbolicLinkW(symlink_file_name, target_file_name, flags);
+
+	SetLastError(ERROR_CALL_NOT_IMPLEMENTED);
+	return FALSE;
+}
+
 DWORD
 pGetFinalPathNameByHandleW(HANDLE handle, LPWSTR path_buf, DWORD path_buf_len, DWORD flags)
 {

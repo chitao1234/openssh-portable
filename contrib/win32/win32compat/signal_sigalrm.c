@@ -29,8 +29,8 @@
 */
 
 #include "signal_internal.h"
-#include "inc\sys\time.h"
-#include "inc\signal.h"
+#include "sys/time.h"
+#include "signal.h"
 #include "debug.h"
 #include "w32api_proxies.h"
 

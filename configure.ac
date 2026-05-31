@@ -103,6 +103,48 @@ if test ! -z "$PATH_PASSWD_PROG" ; then
 		[Full path of your "passwd" program])
 fi
 
+LIBWIN32COMPAT=
+WIN32COMPAT_CPPFLAGS=
+WIN32COMPAT_MAKE_CPPFLAGS=
+AC_SUBST([LIBWIN32COMPAT])
+AC_SUBST([WIN32COMPAT_CPPFLAGS])
+AC_SUBST([WIN32COMPAT_MAKE_CPPFLAGS])
+
+case "$host" in
+*-*-mingw*)
+	LIBWIN32COMPAT="libwin32compat.a"
+	WIN32COMPAT_CPPFLAGS="-DWIN32 -DWINDOWS -D_WINDOWS -D_CRT_DECLARE_NONSTDC_NAMES=0 -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS -D_WINSOCK_DEPRECATED_NO_WARNINGS -D_WIN32_WINNT=0x0501 -DGSSAPI=1 -DGSSAPI_SSPI=1 -DHAVE_GSSAPI_H=1"
+	WIN32COMPAT_MAKE_CPPFLAGS="-I\$(top_srcdir)/contrib/win32/win32compat/inc"
+	CPPFLAGS="-I${srcdir}/contrib/win32/win32compat/inc $CPPFLAGS"
+	LIBS="$LIBS -lws2_32 -lnetapi32 -lsecur32 -luserenv -lshlwapi -ladvapi32 -lshell32 -lole32 -lcrypt32 -lrpcrt4"
+
+	# Seed MinGW results for wrapper-backed headers and cross-size probes.
+	ac_cv_header_netdb_h=yes
+	ac_cv_header_poll_h=yes
+	ac_cv_header_sys_select_h=yes
+	ac_cv_func_freeaddrinfo=yes
+	ac_cv_func_gai_strerror=yes
+	ac_cv_func_getaddrinfo=yes
+	ac_cv_func_getnameinfo=yes
+	ac_cv_func_fstatvfs=yes
+	ac_cv_func_realpath=yes
+	ac_cv_func_statvfs=yes
+	ac_cv_func_strmode=yes
+	ac_cv_have_sa_family_t=no
+	ac_cv_have_struct_in6_addr=yes
+	ac_cv_have_struct_sockaddr_in6=yes
+	ac_cv_member_struct_pollfd_fd=yes
+	ac_cv_member_struct_sockaddr_in6_sin6_scope_id=yes
+	ac_cv_type_fsblkcnt_t=no
+	ac_cv_type_fsfilcnt_t=no
+	ac_cv_sizeof_short_int=2
+	ac_cv_sizeof_int=4
+	ac_cv_sizeof_long_int=4
+	ac_cv_sizeof_long_long_int=8
+	ac_cv_sizeof_time_t=8
+	;;
+esac
+
 dnl Since autoconf doesn't support it very well,  we no longer allow users to
 dnl override LD, however keeping the hook here for now in case there's a use
 dnl use case we overlooked and someone needs to re-enable it.  Unless a good
@@ -749,6 +791,9 @@ case "$host" in
 	# reasons which cause compile warnings, so we disable those warnings.
 	OSSH_CHECK_CFLAG_COMPILE([-Wno-attributes])
 	SHLIBEXT=".dll"
+	;;
+*-*-mingw*)
+	AC_DEFINE([WINDOWS], [1], [Define if building for Windows])
 	;;
 *-*-dgux*)
 	AC_DEFINE([IP_TOS_IS_BROKEN], [1],
@@ -5736,9 +5781,15 @@ AC_SUBST([LDFLAGS_NOPIE])
 AC_SUBST([CFLAGS_NOPIE])
 
 AC_EXEEXT
-AC_CONFIG_FILES([Makefile buildpkg.sh opensshd.init openssh.xml \
+files="Makefile buildpkg.sh opensshd.init openssh.xml \
 	openbsd-compat/Makefile openbsd-compat/regress/Makefile \
-	survey.sh])
+	survey.sh"
+case "$host" in
+*-*-mingw*)
+	files="$files contrib/win32/win32compat/Makefile"
+	;;
+esac
+AC_CONFIG_FILES([$files])
 AC_OUTPUT
 
 # Print summary of options

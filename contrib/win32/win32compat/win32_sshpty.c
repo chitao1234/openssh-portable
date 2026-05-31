@@ -4,9 +4,9 @@
 
 
 
-#include <Windows.h>
-#include "..\..\..\sshpty.h"
-#include "inc\unistd.h"
+#include <windows.h>
+#include "../../../sshpty.h"
+#include "unistd.h"
 #include "misc_internal.h"
 
 /* 

@@ -28,7 +28,7 @@
 * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "inc\sys\types.h"
+#include "sys/types.h"
 
 /* uuidswap.c defs */
 void

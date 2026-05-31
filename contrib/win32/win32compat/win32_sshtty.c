@@ -2,8 +2,8 @@
  * Windows version of sshtty* routines implemented in sshtty.c 
  */
 
-#include <Windows.h>
-#include "..\..\..\sshpty.h"
+#include <windows.h>
+#include "../../../sshpty.h"
 static struct termios _saved_tio;
 static int _in_raw_mode = 0;
 

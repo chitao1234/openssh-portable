@@ -1,5 +1,9 @@
-#include "crtheaders.h"
-#include FCNTL_H
+#if defined(__GNUC__)
+# include_next <fcntl.h>
+#else
+# include "crtheaders.h"
+# include FCNTL_H
+#endif
 
 /*fcntl commands*/
 #define F_GETFL 0x1
@@ -44,7 +48,9 @@ void* w32_fd_to_handle(int fd);
 * - cross check conflict with common macros in Windows headers
 * - Ex. #define O_APPEND    0x8
 */
+#ifndef O_ACCMODE
 #define O_ACCMODE			0x0003
+#endif
 #define O_NONBLOCK			0x0004  /*io operations wont block*/
 # define S_IXUSR			0000100	/* execute/search permission, */
 # define S_IXGRP			0000010	/* execute/search permission, */

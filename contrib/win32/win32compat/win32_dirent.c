@@ -33,9 +33,9 @@
 #include <ctype.h>
 #include <string.h>
 
-#include "inc\utf.h"
-#include "inc\dirent.h"
-#include "inc\libgen.h"
+#include "utf.h"
+#include "dirent.h"
+#include "libgen.h"
 #include "misc_internal.h"
 
 struct DIR_ {

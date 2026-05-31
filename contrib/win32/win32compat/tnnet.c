@@ -35,8 +35,8 @@
 #include <string.h>
 #include <windows.h>
 #include "ansiprsr.h"
-#include "inc\utf.h"
-#include "inc\string.h"
+#include "utf.h"
+#include "string.h"
 #include "console.h"
 #include "misc_internal.h"
 

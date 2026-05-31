@@ -6,8 +6,8 @@
 #include "includes.h"
 #include <inc/dirent.h>
 #include <fcntl.h>
-#include <sys\types.h>
-#include <sys\stat.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include "../test_helper/test_helper.h"
 #include "tests.h"

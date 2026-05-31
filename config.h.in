@@ -1984,6 +1984,9 @@
 /* compiler supports variable length arrays */
 #undef VARIABLE_LENGTH_ARRAYS
 
+/* Define if building for Windows */
+#undef WINDOWS
+
 /* Define if you shouldn't strip 'tty' from your ttyname in [uw]tmp */
 #undef WITH_ABBREV_NO_TTY
 

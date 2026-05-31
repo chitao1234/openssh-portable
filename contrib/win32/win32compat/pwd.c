@@ -33,17 +33,17 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <Windows.h>
+#include <windows.h>
 #include <stdio.h>
-#include <LM.h>
+#include <lm.h>
 #include <sddl.h>
-#include <DsGetDC.h>
+#include <dsgetdc.h>
 #define SECURITY_WIN32
 #include <security.h>
 
-#include "inc\pwd.h"
-#include "inc\grp.h"
-#include "inc\utf.h"
+#include "pwd.h"
+#include "grp.h"
+#include "utf.h"
 #include "misc_internal.h"
 #include "debug.h"
 

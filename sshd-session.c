@@ -71,7 +71,7 @@
 #endif
 
 #ifdef WINDOWS
-#include "sshTelemetry.h"
+#include "sshtelemetry.h"
 #endif
 
 #include "xmalloc.h"

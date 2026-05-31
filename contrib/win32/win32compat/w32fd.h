@@ -32,9 +32,9 @@
 
 #pragma once
 
-#include <Windows.h>
+#include <windows.h>
 #include <stdio.h>
-#include "inc\sys\types.h"
+#include "sys/types.h"
 
 enum w32_io_type {
 	UNKNOWN_FD = 0,

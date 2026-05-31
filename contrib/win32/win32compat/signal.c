@@ -34,7 +34,7 @@
 #include "debug.h"
 
 /* Apply caution while changing this order of inclusion of below 2 signal.h headers */
-#include "inc\signal.h"
+#include "signal.h"
 #undef signal
 #undef raise
 #undef SIGINT

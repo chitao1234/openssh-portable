@@ -34,24 +34,24 @@
 */
 #define SECURITY_WIN32
 #define UMDF_USING_NTSTATUS 
-#include <Windows.h>
-#include <UserEnv.h>
-#include <Ntsecapi.h>
+#include <windows.h>
+#include <userenv.h>
+#include <ntsecapi.h>
 #include <ntstatus.h>
-#include <Shlobj.h>
-#include <LM.h>
+#include <shlobj.h>
+#include <lm.h>
 #include <security.h>
 
-#include "inc\utf.h"
+#include "utf.h"
 #include "w32api_proxies.h"
-#include <Ntsecapi.h>
-#include <Strsafe.h>
+#include <ntsecapi.h>
+#include <strsafe.h>
 #include <sddl.h>
 #include <ntstatus.h>
 #include "misc_internal.h"
 #include "lsa_missingdefs.h"
-#include "Debug.h"
-#include "inc\pwd.h"
+#include "debug.h"
+#include "pwd.h"
 
 #pragma warning(push, 3)
 HANDLE password_auth_token = NULL;

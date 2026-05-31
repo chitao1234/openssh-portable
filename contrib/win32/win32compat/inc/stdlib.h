@@ -1,5 +1,10 @@
-#include "crtheaders.h"
-#include STDLIB_H
+#pragma once
+#if defined(__GNUC__)
+# include_next <stdlib.h>
+#else
+# include "crtheaders.h"
+# include STDLIB_H
+#endif
 
 #define environ _environ
 void freezero(void *, size_t);

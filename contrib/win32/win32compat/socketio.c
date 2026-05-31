@@ -34,7 +34,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include "w32fd.h"
-#include "inc\utf.h"
+#include "utf.h"
 #include "misc_internal.h"
 #include "debug.h"
 

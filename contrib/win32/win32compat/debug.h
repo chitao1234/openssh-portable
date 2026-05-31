@@ -3,8 +3,8 @@
 #define __attribute__(A)
 #endif
 
-#include "..\..\..\log.h"
-#include "..\..\..\ssherr.h"
+#include "../../../log.h"
+#include "../../../ssherr.h"
 /* Enable the following for verbose logging */
 #if (0)
 #define debug4 debug2

@@ -5,8 +5,8 @@
 */
 
 #pragma once
-#include <WinSock2.h>
-#include <WS2tcpip.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 
 /* Shutdown constants */
 #define SHUT_WR SD_SEND
@@ -65,11 +65,3 @@ void w32_freeaddrinfo(struct addrinfo *);
 int w32_getaddrinfo(const char *, const char *,
 	const struct addrinfo *, struct addrinfo **);
 #define getaddrinfo         w32_getaddrinfo
-
-struct w32_pollfd {
-	int  fd;
-	short   events;
-	short   revents;
-};
-#define pollfd w32_pollfd
-

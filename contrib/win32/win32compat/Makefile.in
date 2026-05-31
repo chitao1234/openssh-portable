@@ -1,0 +1,59 @@
+sysconfdir=@sysconfdir@
+piddir=@piddir@
+srcdir=@srcdir@
+top_srcdir=@top_srcdir@
+
+VPATH=@srcdir@
+CC=@CC@
+LD=@LD@
+CFLAGS=@CFLAGS@
+CPPFLAGS=-I. -I../../.. -I$(srcdir) -I$(top_srcdir) -I$(top_srcdir)/contrib/win32/openssh @WIN32COMPAT_MAKE_CPPFLAGS@ @WIN32COMPAT_CPPFLAGS@ @CPPFLAGS@ @DEFS@
+LIBS=@LIBS@
+AR=@AR@
+RANLIB=@RANLIB@
+INSTALL=@INSTALL@
+LDFLAGS=-L. @LDFLAGS@
+
+WIN32COMPATFILES = \
+	ansiprsr.o \
+	console.o \
+	fileio.o \
+	gss-sspi.o \
+	misc.o \
+	no-ops.o \
+	pwd.o \
+	signal.o \
+	signal_sigalrm.o \
+	signal_sigchld.o \
+	signal_wait.o \
+	socketio.o \
+	spawn.o \
+	termio.o \
+	tncon.o \
+	tnnet.o \
+	utf.o \
+	w32api_proxies.o \
+	w32fd.o \
+	w32log.o \
+	win32_dirent.o \
+	win32_pty.o \
+	win32_usertoken_utils.o
+
+WIN32COMPATLIB=@LIBWIN32COMPAT@
+
+.c.o:
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $<
+
+all: $(WIN32COMPATLIB)
+
+install:
+
+clean:
+	rm -f *.o *.a core
+
+distclean: clean
+	rm -f Makefile *~
+
+$(WIN32COMPATLIB): $(WIN32COMPATFILES)
+	$(AR) rv $@ $(WIN32COMPATFILES)
+	$(RANLIB) $@

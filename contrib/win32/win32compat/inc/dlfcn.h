@@ -1,5 +1,5 @@
 #pragma once
-#include <Windows.h>
+#include <windows.h>
 #define RTLD_NOW 0
 
 HMODULE dlopen(const char *filename, int flags);

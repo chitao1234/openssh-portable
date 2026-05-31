@@ -1,4 +1,4 @@
-#include <Windows.h>
+#include <windows.h>
 #include <process.h>
 #include "misc_internal.h"
 

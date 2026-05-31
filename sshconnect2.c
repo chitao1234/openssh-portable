@@ -76,7 +76,7 @@
 #include "sk-api.h"
 
 #ifdef WINDOWS
-#include "sshTelemetry.h"
+#include "sshtelemetry.h"
 #endif
 
 #ifdef GSSAPI

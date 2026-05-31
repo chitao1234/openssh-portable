@@ -29,17 +29,17 @@
 * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "inc\sys\socket.h"
-#include "inc\sys\select.h"
-#include "inc\sys\uio.h"
-#include "inc\sys\time.h"
-#include "inc\sys\types.h"
-#include "inc\sys\stat.h"
-#include "inc\unistd.h"
-#include "inc\fcntl.h"
-#include "inc\sys\un.h"
-#include "inc\utf.h"
-#include "inc\stdio.h"
+#include "sys/socket.h"
+#include "sys/select.h"
+#include "sys/uio.h"
+#include "sys/time.h"
+#include "sys/types.h"
+#include "sys/stat.h"
+#include "unistd.h"
+#include "fcntl.h"
+#include "sys/un.h"
+#include "utf.h"
+#include "stdio.h"
 
 #include "w32fd.h"
 #include "signal_internal.h"
@@ -47,10 +47,10 @@
 #include <errno.h>
 #include <time.h>
 #include <assert.h>
-#include <direct.h>
+#include "direct.h"
 #include <winioctl.h>
-#include "Shlwapi.h"
-#include <sys\utime.h>
+#include <shlwapi.h>
+#include <sys/utime.h>
 #include "misc_internal.h"
 #include "debug.h"
 #include "userenv.h"
@@ -1195,7 +1195,7 @@ cleanup:
 	return ret;
 }
 
-#include "inc\spawn.h"
+#include "spawn.h"
 
 /* structures defining binary layout of fd info to be transmitted between parent and child processes*/
 struct std_fd_state {

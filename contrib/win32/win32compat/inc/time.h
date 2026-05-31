@@ -1,5 +1,10 @@
-#include "crtheaders.h"
-#include TIME_H
+#pragma once
+#if defined(__GNUC__)
+# include_next <time.h>
+#else
+# include "crtheaders.h"
+# include TIME_H
+#endif
 
 #define localtime w32_localtime
 #define ctime w32_ctime

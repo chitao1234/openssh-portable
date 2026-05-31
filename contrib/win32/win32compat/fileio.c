@@ -32,20 +32,21 @@
 */
 
 #include <fcntl.h>
-#include "inc/sys/stat.h"
-#include "inc/sys/types.h"
+#include "sys/stat.h"
+#include "sys/types.h"
 #include <io.h>
 #include <errno.h>
 #include <stddef.h>
-#include <direct.h>
+#include "direct.h"
+#include <wctype.h>
 
 #include "w32fd.h"
-#include "inc\utf.h"
-#include "inc\fcntl.h"
-#include "inc\pwd.h"
+#include "utf.h"
+#include "fcntl.h"
+#include "pwd.h"
 #include "misc_internal.h"
 #include "debug.h"
-#include <Sddl.h>
+#include <sddl.h>
 
 /* internal read buffer size */
 #define READ_BUFFER_SIZE 100*1024
@@ -901,7 +902,7 @@ fileio_stat_or_lstat_internal(const char *path, struct _stat64 *buf, int do_lsta
 	buf->st_nlink = 1; /* number of hard links. Always 1 on non - NTFS file systems.*/
 	buf->st_mode |= file_attr_to_st_mode(wpath, attributes.dwFileAttributes);
 	buf->st_size = attributes.nFileSizeLow | (((off_t)attributes.nFileSizeHigh) << 32);
-	if (wcslen(wpath) > 1 && __ascii_iswalpha(*wpath) && (*(wpath + 1) == ':'))
+	if (wcslen(wpath) > 1 && iswalpha(*wpath) && (*(wpath + 1) == ':'))
 		buf->st_dev = buf->st_rdev = towupper(*wpath) - L'A'; /* drive num */
 	else
 		buf->st_dev = buf->st_rdev = _getdrive() - 1;
@@ -1336,15 +1337,15 @@ fileio_symlink(const char *target, const char *linkpath)
 
 	/* use the attribute of the file to determine the proper flag to send */
 	DWORD create_flags = (attributes.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ?
-		SYMBOLIC_LINK_FLAG_DIRECTORY : 0;
+		0x1 : 0;
 
 	/* symlink creation on earlier versions of windows were a privileged op
  	 * and then an option was added to create symlink using from an unprivileged
  	 * context so we try both operations, attempting privileged version first.
 	 * note: 0x2 = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE
 	 */
-	if (CreateSymbolicLinkW(linkpath_utf16, resolved_target_utf16, create_flags) == 0) {
-		if (CreateSymbolicLinkW(linkpath_utf16, resolved_target_utf16, create_flags | 0x2) == 0) {
+	if (pCreateSymbolicLinkW(linkpath_utf16, resolved_target_utf16, create_flags) == 0) {
+		if (pCreateSymbolicLinkW(linkpath_utf16, resolved_target_utf16, create_flags | 0x2) == 0) {
 			errno = errno_from_Win32LastError();
 			goto cleanup;
 		}

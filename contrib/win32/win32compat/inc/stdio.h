@@ -1,5 +1,10 @@
-#include "crtheaders.h"
-#include STDIO_H
+#pragma once
+#if defined(__GNUC__)
+# include_next <stdio.h>
+#else
+# include "crtheaders.h"
+# include STDIO_H
+#endif
 
 /* stdio.h overrides */
 FILE* w32_fopen_utf8(const char *, const char *);

@@ -39,7 +39,7 @@
 #include "pal_doexec.h"
 #include "misc_internal.h"
 #include "w32api_proxies.h"
-#include "sshTelemetry.h"
+#include "sshtelemetry.h"
 
 #ifndef SUBSYSTEM_NONE
 #define SUBSYSTEM_NONE				0

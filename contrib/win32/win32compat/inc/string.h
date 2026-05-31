@@ -1,5 +1,10 @@
-#include "crtheaders.h"
-#include STRING_H
+#pragma once
+#if defined(__GNUC__)
+# include_next <string.h>
+#else
+# include "crtheaders.h"
+# include STRING_H
+#endif
 #include "utf.h"
 
 /* string.h overrides */

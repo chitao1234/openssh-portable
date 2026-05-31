@@ -77,7 +77,7 @@
 #include "channels.h"
 
 #ifdef WINDOWS
-#include <Windows.h>
+#include <windows.h>
 #include "misc_internal.h"
 #include "sshfileperm.h"
 #endif // WINDOWS

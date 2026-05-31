@@ -69,7 +69,7 @@
 #endif
 #ifdef WINDOWS
 #include <lmcons.h>
-#include <Windows.h>
+#include <windows.h>
 #endif
 
 #include "openbsd-compat/openssl-compat.h"
