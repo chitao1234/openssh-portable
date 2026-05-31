@@ -1697,7 +1697,6 @@
 #endif
 
 #define HAVE_BZERO 1
-#define PATH_MAX 32768
 #define S_IFIFO        0x1000
 #define HAVE_EXPLICIT_BZERO
 #define HAVE_MBTOWC 1

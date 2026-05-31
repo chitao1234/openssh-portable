@@ -117,6 +117,10 @@ enum
 # endif
 #endif
 
+#ifdef WINDOWS
+# include "contrib/win32/win32compat/win32_path_max.h"
+#endif
+
 #ifndef MAXPATHLEN
 # ifdef PATH_MAX
 #  define MAXPATHLEN PATH_MAX

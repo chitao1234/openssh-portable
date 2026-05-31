@@ -1,6 +1,7 @@
 #pragma once
 
 #include "w32api_proxies.h"
+#include "win32_path_max.h"
 
 #define SSH_REGISTRY_ROOT L"SOFTWARE\\OpenSSH"
 #define GOTO_CLEANUP_IF(_cond_,_err_) do {  \
@@ -22,9 +23,6 @@
 #define CYGWIN_PATH_PREFIX "/cygdrive/"
 
 #define errno_from_Win32LastError() errno_from_Win32Error(GetLastError())
-
-/* maximum potential size for paths when long paths are enabled */
-#define PATH_MAX 32768
 
 /* maximum size for user principal name as defined in ad schema */
 #define MAX_UPN_LEN 1024
