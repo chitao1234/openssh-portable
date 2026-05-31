@@ -66,6 +66,15 @@ ReadAPCProc(_In_ ULONG_PTR dwParam)
 	WaitForSingleObject(pio->read_overlapped.hEvent, INFINITE);
 	CloseHandle(pio->read_overlapped.hEvent);
 	pio->read_overlapped.hEvent = 0;
+	if (pio->sync_read_status.close_after_read) {
+		if (FILETYPE(pio) != FILE_TYPE_CHAR)
+			CloseHandle(WINHANDLE(pio));
+		if (pio->read_details.buf)
+			free(pio->read_details.buf);
+		if (pio->write_details.buf)
+			free(pio->write_details.buf);
+		free(pio);
+	}
 }
 
 /* Read worker thread */
@@ -261,6 +270,8 @@ InterruptThread(_In_ ULONG_PTR dwParam)
 int 
 syncio_close(struct w32_io* pio)
 {
+	int should_defer_free = 0;
+
 	debug4("syncio_close - pio:%p", pio);
 
 	/*
@@ -287,19 +298,28 @@ syncio_close(struct w32_io* pio)
 		1. For console - the read thread is blocked by the while loop on raw mode
 		2. Function ReadFile on Win7 machine dees not return when no content to read in non-interactive mode.
 		*/
-		if (FILETYPE(pio) == FILE_TYPE_CHAR && (IsWin7OrLess() || in_raw_mode)) {
-			QueueUserAPC(InterruptThread, pio->read_overlapped.hEvent, (ULONG_PTR)NULL);
-			pCancelSynchronousIo(pio->read_overlapped.hEvent);
-		}
+			if (FILETYPE(pio) == FILE_TYPE_CHAR && (IsWin7OrLess() || in_raw_mode)) {
+				QueueUserAPC(InterruptThread, pio->read_overlapped.hEvent, (ULONG_PTR)NULL);
+				if (!pCancelSynchronousIo(pio->read_overlapped.hEvent) &&
+				    GetLastError() == ERROR_CALL_NOT_IMPLEMENTED)
+					should_defer_free = 1;
+			}
 
 		// give the read thread some time to wind down, but don't block syncio_close
-		if (WAIT_TIMEOUT == WaitForSingleObject(pio->read_overlapped.hEvent, 1000)) {
+		if (!should_defer_free &&
+		    WAIT_TIMEOUT == WaitForSingleObject(pio->read_overlapped.hEvent, 1000)) {
 			debug4("read_overlapped thread timed out");
+			should_defer_free = 1;
 		}
 	}
 
 	/* drain queued APCs */
 	SleepEx(0, TRUE);
+
+	if (should_defer_free) {
+		pio->sync_read_status.close_after_read = TRUE;
+		return 0;
+	}
 
 	/* TODO - fix this, closing Console handles is interfering with TTY/PTY rendering */
 	if (FILETYPE(pio) != FILE_TYPE_CHAR)

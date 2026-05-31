@@ -107,6 +107,7 @@ struct w32_io {
 		DWORD to_transfer;
 		DWORD transferred;
 		DWORD error;
+		BOOL close_after_read;
 	}sync_read_status;
 	struct {
 		DWORD to_transfer;

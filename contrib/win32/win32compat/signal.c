@@ -34,7 +34,10 @@
 #include "Debug.h"
 
 /* Apply caution while changing this order of inclusion of below 2 signal.h headers */
-#include "signal.h"
+#include "native_signal.h"
+static int (*native_raise)(int) = raise;
+static const int native_sigsegv = SIGSEGV;
+#undef signal
 #undef signal
 #undef raise
 #undef SIGINT
@@ -48,7 +51,7 @@
 #undef SIG_IGN
 #undef SIG_ERR
 #undef NSIG
-#include <signal.h>
+#include "signal.h"
 #undef NSIG
 #define NSIG 0
 
@@ -168,7 +171,7 @@ w32_raise(int sig)
 {
 	debug4("raise sig:%d", sig);
 	if (sig == W32_SIGSEGV)
-		return raise(SIGSEGV); /* raise native exception handler*/
+		return native_raise(native_sigsegv); /* raise native exception handler*/
 
 	if (sig >= W32_SIGMAX) {
 		errno = EINVAL;

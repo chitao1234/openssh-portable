@@ -54,6 +54,8 @@ int w32_lstat(const char *path, struct w32_stat *buf);
 #define lstat w32_lstat
 
 int w32_mkdir(const char *pathname, unsigned short mode);
+#undef mkdir
+#define mkdir(path, mode) w32_mkdir((path), (mode))
 
 int w32_chmod(const char *, mode_t);
 #define chmod w32_chmod
