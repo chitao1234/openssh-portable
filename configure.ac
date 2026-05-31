@@ -169,6 +169,7 @@ case "$host" in
 	ac_cv_sizeof_long_int=4
 	ac_cv_sizeof_long_long_int=8
 	ac_cv_sizeof_time_t=8
+	maildir=/var/spool/mail
 	;;
 esac
 
