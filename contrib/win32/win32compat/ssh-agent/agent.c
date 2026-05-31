@@ -42,9 +42,6 @@
 extern char* allowed_providers;
 extern int remote_add_provider;
 
-char* sshagent_con_username;
-HANDLE sshagent_client_primary_token;
-
 static HANDLE ioc_port = NULL;
 static BOOL debug_mode = FALSE;
 

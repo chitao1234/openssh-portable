@@ -86,6 +86,10 @@ wchar_t* __wprogdir = L"";
 char* __progdata = "";
 wchar_t* __wprogdata = L"";
 
+/* ssh-agent impersonation context */
+char *sshagent_con_username = NULL;
+HANDLE sshagent_client_primary_token = NULL;
+
 /* initializes mapping table*/
 static int
 fd_table_initialize()

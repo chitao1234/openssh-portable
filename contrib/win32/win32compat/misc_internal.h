@@ -44,6 +44,10 @@ extern wchar_t* __wprogdir;
 extern char* __progdata;
 extern wchar_t* __wprogdata;
 
+/* per-connection agent impersonation context, populated by ssh-agent */
+extern char *sshagent_con_username;
+extern HANDLE sshagent_client_primary_token;
+
 static char *machine_domain_name;
 
 extern char* chroot_path;
