@@ -1,12 +1,11 @@
 #pragma once
 
 #include <sys/types.h>
+#include <winsock2.h>
 
-struct pollfd {
-	int fd;
-	short events;
-	short revents;
-};
+#ifndef HAVE_NFDS_T
+typedef unsigned int nfds_t;
+#endif
 
 #ifndef POLLIN
 # define POLLIN 0x0001
@@ -29,5 +28,3 @@ struct pollfd {
 #ifndef INFTIM
 # define INFTIM (-1)
 #endif
-
-int poll(struct pollfd *, nfds_t, int);

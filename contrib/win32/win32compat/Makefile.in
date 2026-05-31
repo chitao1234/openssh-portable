@@ -35,9 +35,13 @@ WIN32COMPATFILES = \
 	w32api_proxies.o \
 	w32fd.o \
 	w32log.o \
+	w32-sshfileperm.o \
 	win32_dirent.o \
 	win32_pty.o \
-	win32_usertoken_utils.o
+	win32_usertoken_utils.o \
+	wmain_sshd.o \
+	wmain_sshd-auth.o \
+	wmain_sshd-session.o
 
 WIN32COMPATLIB=@LIBWIN32COMPAT@
 

@@ -56,34 +56,6 @@ permanently_set_uid(struct passwd *pw)
 }
 
 
-/* mux.c defs */
-int muxserver_sock = -1;
-typedef struct Channel Channel;
-unsigned int muxclient_command = 0;
-void
-muxserver_listen(void)
-{
-	return;
-}
-
-void
-mux_exit_message(Channel *c, int exitval)
-{
-	return;
-}
-
-void
-mux_tty_alloc_failed(Channel *c)
-{
-	return;
-}
-
-void
-muxclient(const char *path)
-{
-	return;
-}
-
 int
 innetgr(const char *netgroup, const char *host, const char *user, const char *domain)
 {
@@ -115,4 +87,3 @@ startup_handler(void)
 {
 	return 0;
 }
-

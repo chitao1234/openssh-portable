@@ -1,5 +1,7 @@
 #pragma once
 #if defined(__GNUC__)
+# include <corecrt_wstdlib.h>
+# include <sec_api/stdlib_s.h>
 # include_next <stdlib.h>
 #else
 # include "crtheaders.h"

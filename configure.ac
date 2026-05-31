@@ -106,30 +106,42 @@ fi
 LIBWIN32COMPAT=
 WIN32COMPAT_CPPFLAGS=
 WIN32COMPAT_MAKE_CPPFLAGS=
+WIN32COMPAT_LIB=
+GROUPACCESS_O=groupaccess.o
 AC_SUBST([LIBWIN32COMPAT])
 AC_SUBST([WIN32COMPAT_CPPFLAGS])
 AC_SUBST([WIN32COMPAT_MAKE_CPPFLAGS])
+AC_SUBST([WIN32COMPAT_LIB])
+AC_SUBST([GROUPACCESS_O])
 
 case "$host" in
 *-*-mingw*)
 	LIBWIN32COMPAT="libwin32compat.a"
+	WIN32COMPAT_LIB="contrib/win32/win32compat/${LIBWIN32COMPAT}"
 	WIN32COMPAT_CPPFLAGS="-DWIN32 -DWINDOWS -D_WINDOWS -D_CRT_DECLARE_NONSTDC_NAMES=0 -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS -D_WINSOCK_DEPRECATED_NO_WARNINGS -D_WIN32_WINNT=0x0501 -DGSSAPI=1 -DGSSAPI_SSPI=1 -DHAVE_GSSAPI_H=1"
-	WIN32COMPAT_MAKE_CPPFLAGS="-I\$(top_srcdir)/contrib/win32/win32compat/inc"
+	WIN32COMPAT_MAKE_CPPFLAGS="-I\$(top_srcdir)/contrib/win32/win32compat/inc -I\$(top_srcdir)/contrib/win32/win32compat"
 	CPPFLAGS="-I${srcdir}/contrib/win32/win32compat/inc $CPPFLAGS"
 	LIBS="$LIBS -lws2_32 -lnetapi32 -lsecur32 -luserenv -lshlwapi -ladvapi32 -lshell32 -lole32 -lcrypt32 -lrpcrt4"
+	GROUPACCESS_O=win32_groupaccess.o
 
 	# Seed MinGW results for wrapper-backed headers and cross-size probes.
 	ac_cv_header_netdb_h=yes
 	ac_cv_header_poll_h=yes
 	ac_cv_header_sys_select_h=yes
+	ac_cv_func_fnmatch=yes
 	ac_cv_func_freeaddrinfo=yes
 	ac_cv_func_gai_strerror=yes
 	ac_cv_func_getaddrinfo=yes
+	ac_cv_func_getgrouplist=yes
 	ac_cv_func_getnameinfo=yes
+	ac_cv_func_group_from_gid=yes
 	ac_cv_func_fstatvfs=yes
 	ac_cv_func_realpath=yes
 	ac_cv_func_statvfs=yes
 	ac_cv_func_strmode=yes
+	ac_cv_func_tcgetpgrp=yes
+	ac_cv_func_waitpid=yes
+	ac_cv_search_getrrsetbyname='none required'
 	ac_cv_have_sa_family_t=no
 	ac_cv_have_struct_in6_addr=yes
 	ac_cv_have_struct_sockaddr_in6=yes

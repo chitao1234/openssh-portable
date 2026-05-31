@@ -558,7 +558,7 @@ w32_open(const char *pathname, int flags, ... /* arg */)
 	return min_index;
 }
 
-int
+ssize_t
 w32_read(int fd, void *dst, size_t max)
 {
 	CHECK_FD(fd);
@@ -568,7 +568,7 @@ w32_read(int fd, void *dst, size_t max)
 	return fileio_read(fd_table.w32_ios[fd], dst, max);
 }
 
-int
+ssize_t
 w32_write(int fd, const void *buf, size_t max)
 {
 	CHECK_FD(fd);
@@ -579,15 +579,15 @@ w32_write(int fd, const void *buf, size_t max)
 	return fileio_write_wrapper(fd_table.w32_ios[fd], buf, max);
 }
 
-int
+ssize_t
 w32_writev(int fd, const struct iovec *iov, int iovcnt)
 {
-	int written = 0;
+	ssize_t written = 0;
 	int i = 0;
 
 	CHECK_FD(fd);
 	for (i = 0; i < iovcnt; i++) {
-		int ret = w32_write(fd, iov[i].iov_base, iov[i].iov_len);
+		ssize_t ret = w32_write(fd, iov[i].iov_base, iov[i].iov_len);
 		if (ret > 0)
 			written += ret;
 	}

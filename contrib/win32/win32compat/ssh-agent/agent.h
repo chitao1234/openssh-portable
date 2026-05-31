@@ -1,5 +1,8 @@
-#include <Windows.h>
+#include "config.h"
+#include "includes.h"
+#include <windows.h>
 #include <stdio.h>
+#include "authfd.h"
 #include "Debug.h"
 #include "misc_internal.h"
 

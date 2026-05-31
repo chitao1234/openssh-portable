@@ -34,7 +34,7 @@
 
 #pragma warning(push, 3)
 
-int process_request(struct agent_connection*);
+static int process_request(struct agent_connection*);
 
 #define ABORT_CONNECTION_RETURN(c) do {	\
 	c->state = DONE;		\

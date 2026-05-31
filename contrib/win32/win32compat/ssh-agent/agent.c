@@ -31,8 +31,8 @@
 #include "config.h"
 #include "agent.h"
 #include <sddl.h>
-#include <UserEnv.h>
-#include "..\misc_internal.h"
+#include <userenv.h>
+#include "../misc_internal.h"
 #include <pwd.h>
 #include "xmalloc.h"
 
@@ -51,7 +51,7 @@ static BOOL debug_mode = FALSE;
 
 static HANDLE event_stop_agent;
 static OVERLAPPED ol;
-static 	HANDLE pipe;
+static HANDLE listener_pipe;
 static	SECURITY_ATTRIBUTES sa;
 
 static size_t nsession_ids;
@@ -64,8 +64,8 @@ agent_cleanup()
 {
 	if (ol.hEvent != NULL)
 		CloseHandle(ol.hEvent);
-	if (pipe != INVALID_HANDLE_VALUE)
-		CloseHandle(pipe);
+	if (listener_pipe != INVALID_HANDLE_VALUE)
+		CloseHandle(listener_pipe);
 	if (ioc_port)
 		CloseHandle(ioc_port);
 	return;
@@ -76,19 +76,23 @@ iocp_work(LPVOID lpParam)
 {
 	DWORD bytes;
 	struct agent_connection* con = NULL;
+	ULONG_PTR completion_key = 0;
 	OVERLAPPED *p_ol;
 	while (1) {
 		con = NULL;
 		p_ol = NULL;
-		if (GetQueuedCompletionStatus(ioc_port, &bytes, &(ULONG_PTR)con, &p_ol, INFINITE) == FALSE) {
+		if (GetQueuedCompletionStatus(ioc_port, &bytes, &completion_key, &p_ol,
+		    INFINITE) == FALSE) {
+			con = (struct agent_connection *)completion_key;
 			debug("iocp error: %d on %p", GetLastError(), con);
 			if (con)
 				agent_connection_on_error(con, GetLastError());
 			else
 				return 0;
-		}
-		else
+		} else {
+			con = (struct agent_connection *)completion_key;
 			agent_connection_on_io(con, bytes, p_ol);
+		}
 	}
 }
 
@@ -116,7 +120,7 @@ agent_listen_loop()
 	sa.bInheritHandle = FALSE;
 
 	while (1) {
-		pipe = CreateNamedPipeW(
+		listener_pipe = CreateNamedPipeW(
 			AGENT_PIPE_ID,		  // pipe name 
 			PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,       // read/write access 
 			PIPE_TYPE_BYTE |       // message type pipe 
@@ -129,10 +133,10 @@ agent_listen_loop()
 			0,                        // client time-out 
 			&sa);
 
-		if (pipe == INVALID_HANDLE_VALUE) {
+		if (listener_pipe == INVALID_HANDLE_VALUE) {
 			verbose("cannot create listener pipe ERROR:%d", GetLastError());
 			SetEvent(event_stop_agent);
-		} else if (ConnectNamedPipe(pipe, &ol) != FALSE) {
+		} else if (ConnectNamedPipe(listener_pipe, &ol) != FALSE) {
 			verbose("ConnectNamedPipe returned TRUE unexpectedly ");
 			SetEvent(event_stop_agent);
 		}
@@ -153,9 +157,9 @@ agent_listen_loop()
 			return;
 		} else if ((r > WAIT_OBJECT_0) && (r <= (WAIT_OBJECT_0 + 1))) {
 			/* process incoming connection */
-			HANDLE con = pipe;
+			HANDLE con = listener_pipe;
 			DWORD client_pid = 0;
-			pipe = INVALID_HANDLE_VALUE;
+			listener_pipe = INVALID_HANDLE_VALUE;
 			GetNamedPipeClientProcessId(con, &client_pid);
 			verbose("client pid %d connected", client_pid);
 			if (debug_mode) {
@@ -265,7 +269,7 @@ agent_start(BOOL dbg_mode)
 		fatal("cannot create global stop event ERROR:%d", GetLastError());
 	if ((ol.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL)) == NULL)
 		fatal("cannot create event ERROR:%d", GetLastError());
-	pipe = INVALID_HANDLE_VALUE;
+	listener_pipe = INVALID_HANDLE_VALUE;
 	sa.bInheritHandle = FALSE;
 	agent_listen_loop();
 }

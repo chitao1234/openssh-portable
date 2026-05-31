@@ -32,7 +32,10 @@
 #include "agent.h"
 #include "agent-request.h"
 #include "config.h"
+#include <stdint.h>
+#include "digest.h"
 #include "match.h"
+#include "sshkey.h"
 #include <sddl.h>
 #ifdef ENABLE_PKCS11
 #include "ssh-pkcs11.h"
@@ -290,11 +293,13 @@ int
 process_add_identity(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) 
 {
 	struct sshkey* key = NULL;
-	int r = 0, blob_len, eblob_len, request_invalid = 0, success = 0;
+	int r = 0, request_invalid = 0, success = 0;
+	DWORD eblob_len = 0;
+	size_t blob_len;
 	size_t comment_len, pubkey_blob_len;
 	u_char *pubkey_blob = NULL;
 	char *thumbprint = NULL, *comment;
-	const char *blob;
+	const u_char *blob;
 	char* eblob = NULL;
 	HKEY reg = 0, sub = 0, user_root = 0;
 	SECURITY_ATTRIBUTES sa;
@@ -303,7 +308,7 @@ process_add_identity(struct sshbuf* request, struct sshbuf* response, struct age
 	memset(&sa, 0, sizeof(SECURITY_ATTRIBUTES));
 	blob = sshbuf_ptr(request);
 	if (sshkey_private_deserialize(request, &key) != 0 ||
-	   (blob_len = (sshbuf_ptr(request) - blob) & 0xffffffff) == 0 ||
+	   (blob_len = (size_t)(sshbuf_ptr(request) - blob)) == 0 ||
 	    sshbuf_get_cstring(request, &comment, &comment_len) != 0) {
 		debug("key add request is invalid");
 		request_invalid = 1;
@@ -320,7 +325,7 @@ process_add_identity(struct sshbuf* request, struct sshbuf* response, struct age
 	sa.nLength = sizeof(sa);
 	if ((!ConvertStringSecurityDescriptorToSecurityDescriptorW(REG_KEY_SDDL, SDDL_REVISION_1, &sa.lpSecurityDescriptor, &sa.nLength)) ||
 	    sshkey_to_blob(key, &pubkey_blob, &pubkey_blob_len) != 0 ||
-	    convert_blob(con, blob, blob_len, &eblob, &eblob_len, 1) != 0 ||
+	    convert_blob(con, (const char *)blob, (DWORD)blob_len, &eblob, &eblob_len, 1) != 0 ||
 	    ((thumbprint = sshkey_fingerprint(key, SSH_FP_HASH_DEFAULT, SSH_FP_DEFAULT)) == NULL) ||
 	    get_user_root(con, &user_root) != 0 ||
 	    RegCreateKeyExW(user_root, SSH_KEYS_ROOT, 0, 0, 0, KEY_WRITE | KEY_WOW64_64KEY, &sa, &reg, NULL) != 0 ||
@@ -447,7 +452,8 @@ done:
 int
 process_sign_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) 
 {
-	u_char *blob, *data, *signature = NULL;
+	const u_char *blob, *data;
+	u_char *signature = NULL;
 	size_t blen, dlen, slen = 0;
 	u_int flags = 0;
 	int r, request_invalid = 0, success = 0;
@@ -579,7 +585,8 @@ int
 process_remove_key(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) 
 {
 	HKEY user_root = 0, root = 0;
-	char *blob, *thumbprint = NULL;
+	const u_char *blob;
+	char *thumbprint = NULL;
 	size_t blen;
 	int r = 0, success = 0, request_invalid = 0;
 	struct sshkey *key = NULL;

@@ -37,7 +37,9 @@
 #include "syslog.h"
 #include "misc_internal.h"
 #include "utf.h"
+#ifndef __MINGW32__
 #include "openssh-events.h"
+#endif
 
 #define MSGBUFSIZ 1024
 static int logfd = -1;
@@ -47,12 +49,22 @@ int log_facility = 0;
 
 void openlog_etw()
 {
+#ifdef __MINGW32__
+	return;
+#else
 	EventRegisterOpenSSH();
+#endif
 }
 
 void
 syslog_etw(int priority, const char *format, const char *formatBuffer)
 {
+#ifdef __MINGW32__
+	(void)priority;
+	(void)format;
+	(void)formatBuffer;
+	return;
+#else
 	wchar_t *w_identity = NULL, *w_payload = NULL;
 	w_identity = utf8_to_utf16(identity);
 	w_payload = utf8_to_utf16(formatBuffer);
@@ -85,6 +97,7 @@ done:
 		free(w_identity);
 	if (w_payload)
 		free(w_payload);
+#endif
 }
 
 

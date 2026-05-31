@@ -92,7 +92,7 @@ typedef u_int8_t	UINT8;  /* 1 byte   */
 typedef u_int16_t	UINT16; /* 2 byte   */
 typedef u_int32_t	UINT32; /* 4 byte   */
 typedef u_int64_t	UINT64; /* 8 bytes  */
-typedef unsigned int	UWORD;  /* Register */
+typedef unsigned int	UMAC_UWORD;  /* Register */
 
 /* ---------------------------------------------------------------------- */
 /* --- Constants -------------------------------------------------------- */
@@ -337,7 +337,7 @@ static void nh_aux(void *kp, const void *dp, void *hp, UINT32 dlen)
 */
 {
     UINT64 h;
-    UWORD c = dlen / 32;
+    UMAC_UWORD c = dlen / 32;
     UINT32 *k = (UINT32 *)kp;
     const UINT32 *d = (const UINT32 *)dp;
     UINT32 d0,d1,d2,d3,d4,d5,d6,d7;
@@ -370,7 +370,7 @@ static void nh_aux(void *kp, const void *dp, void *hp, UINT32 dlen)
  */
 {
   UINT64 h1,h2;
-  UWORD c = dlen / 32;
+  UMAC_UWORD c = dlen / 32;
   UINT32 *k = (UINT32 *)kp;
   const UINT32 *d = (const UINT32 *)dp;
   UINT32 d0,d1,d2,d3,d4,d5,d6,d7;
@@ -417,7 +417,7 @@ static void nh_aux(void *kp, const void *dp, void *hp, UINT32 dlen)
 */
 {
     UINT64 h1,h2,h3;
-    UWORD c = dlen / 32;
+    UMAC_UWORD c = dlen / 32;
     UINT32 *k = (UINT32 *)kp;
     const UINT32 *d = (const UINT32 *)dp;
     UINT32 d0,d1,d2,d3,d4,d5,d6,d7;
@@ -472,7 +472,7 @@ static void nh_aux(void *kp, const void *dp, void *hp, UINT32 dlen)
 */
 {
     UINT64 h1,h2,h3,h4;
-    UWORD c = dlen / 32;
+    UMAC_UWORD c = dlen / 32;
     UINT32 *k = (UINT32 *)kp;
     const UINT32 *d = (const UINT32 *)dp;
     UINT32 d0,d1,d2,d3,d4,d5,d6,d7;
@@ -551,11 +551,11 @@ static void nh_transform(nh_ctx *hc, const UINT8 *buf, UINT32 nbytes)
 /* ---------------------------------------------------------------------- */
 
 #if (__LITTLE_ENDIAN__)
-static void endian_convert(void *buf, UWORD bpw, UINT32 num_bytes)
+static void endian_convert(void *buf, UMAC_UWORD bpw, UINT32 num_bytes)
 /* We endian convert the keys on little-endian computers to               */
 /* compensate for the lack of big-endian memory reads during hashing.     */
 {
-    UWORD iters = num_bytes / bpw;
+    UMAC_UWORD iters = num_bytes / bpw;
     if (bpw == 4) {
         UINT32 *p = (UINT32 *)buf;
         do {
@@ -644,16 +644,16 @@ static void nh_update(nh_ctx *hc, const UINT8 *buf, UINT32 nbytes)
 static void zero_pad(UINT8 *p, int nbytes)
 {
 /* Write "nbytes" of zeroes, beginning at "p" */
-    if (nbytes >= (int)sizeof(UWORD)) {
-        while ((ptrdiff_t)p % sizeof(UWORD)) {
+    if (nbytes >= (int)sizeof(UMAC_UWORD)) {
+        while ((ptrdiff_t)p % sizeof(UMAC_UWORD)) {
             *p = 0;
             nbytes--;
             p++;
         }
-        while (nbytes >= (int)sizeof(UWORD)) {
-            *(UWORD *)p = 0;
-            nbytes -= sizeof(UWORD);
-            p += sizeof(UWORD);
+        while (nbytes >= (int)sizeof(UMAC_UWORD)) {
+            *(UMAC_UWORD *)p = 0;
+            nbytes -= sizeof(UMAC_UWORD);
+            p += sizeof(UMAC_UWORD);
         }
     }
     while (nbytes) {
@@ -1049,7 +1049,7 @@ static int uhash_update(uhash_ctx_t ctx, const u_char *input, long len)
  * hash each one with NH, calling the polyhash on each NH output.
  */
 {
-    UWORD bytes_hashed, bytes_remaining;
+    UMAC_UWORD bytes_hashed, bytes_remaining;
     UINT64 result_buf[STREAMS];
     UINT8 *nh_result = (UINT8 *)&result_buf;
 

@@ -23,13 +23,13 @@ int w32_ftruncate(int, off_t);
 int w32_pipe(int *pfds);
 
 #define read w32_read
-int w32_read(int fd, void *dst, size_t max);
+ssize_t w32_read(int fd, void *dst, size_t max);
 
 #define write w32_write
-int w32_write(int fd, const void *buf, size_t max);
+ssize_t w32_write(int fd, const void *buf, size_t max);
 
 #define writev w32_writev
-int w32_writev(int fd, const struct iovec *iov, int iovcnt);
+ssize_t w32_writev(int fd, const struct iovec *iov, int iovcnt);
 
 int w32_isatty(int fd);
 /* can't do this #define isatty w32_isatty
