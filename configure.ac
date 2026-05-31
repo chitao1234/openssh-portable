@@ -157,6 +157,7 @@ case "$host" in
 	ac_cv_func_localtime_r=yes
 	ac_cv_search_nanosleep='none required'
 	ac_cv_func_utimes=yes
+	ac_cv_func_setsid=yes
 	ac_cv_func_daemon=yes
 	ac_cv_func_getpeereid=yes
 	ac_cv_func_readpassphrase=yes
