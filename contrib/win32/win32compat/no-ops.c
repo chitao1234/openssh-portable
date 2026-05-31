@@ -71,7 +71,7 @@ initgroups(const char *user, gid_t group)
 }
 
 int
-setgroups(gid_t group, char* name)
+setgroups(gid_t ngroups, const gid_t *groups)
 {
 	return 0;
 }

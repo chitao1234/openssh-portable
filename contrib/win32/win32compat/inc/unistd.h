@@ -5,6 +5,8 @@
 */
 #pragma once
 #include <stddef.h>
+#include_next <process.h>
+#include "sys/time.h"
 #include "sys/types.h"
 #include "sys/uio.h"
 #include "fcntl.h"
@@ -56,8 +58,11 @@ unsigned int w32_alarm(unsigned int seconds);
 int w32_setitimer(int which, const struct itimerval* new_value, struct itimerval* old_value);
 #define setitimer w32_setitimer
 
-long w32_lseek(int fd, unsigned __int64 offset, int origin);
-#define lseek w32_lseek
+off_t w32_lseek(int fd, off_t offset, int origin);
+#ifdef lseek
+#undef lseek
+#endif
+#define lseek(a, b, c) w32_lseek((a), (b), (c))
 
 #define getdtablesize() MAX_FDS
 
@@ -96,11 +101,11 @@ int w32_link(const char *oldpath, const char *newpath);
 
 int fork(void);
 int getpid(void);
-int execv(const char *path, char *const argv[]);
-int execve(const char *path, char *const argv[], char *const envp[]);
 int execl(const char *path, const char *arg, ...);
 int execlp(const char *file, const char *arg, ...);
 int initgroups(const char *user, gid_t group);
+int setgroups(gid_t ngroups, const gid_t *groups);
+int setsid(void);
 
 int getpeereid(int, uid_t*, gid_t*);
 

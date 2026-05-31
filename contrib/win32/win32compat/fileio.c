@@ -938,20 +938,32 @@ fileio_lstat(const char *path, struct _stat64 *buf)
 	return fileio_stat_or_lstat_internal(path, buf, 1);
 }
 
-long
-fileio_lseek(struct w32_io* pio, unsigned __int64 offset, int origin)
+off_t
+fileio_lseek(struct w32_io* pio, off_t offset, int origin)
 {
+	unsigned __int64 uoffset;
+
 	debug4("lseek - pio:%p", pio);
 	if (origin != SEEK_SET) {
 		debug3("lseek - ERROR, origin is not supported %d", origin);
 		errno = ENOTSUP;
 		return -1;
 	}
+	if (offset < 0) {
+		debug3("lseek - ERROR, negative offset is not supported %lld",
+		    (long long)offset);
+		errno = EINVAL;
+		return -1;
+	}
 
-	pio->write_overlapped.Offset = pio->read_overlapped.Offset = offset & 0xffffffff;
-	pio->write_overlapped.OffsetHigh = pio->read_overlapped.OffsetHigh = (offset & 0xffffffff00000000) >> 32;
+	uoffset = (unsigned __int64)offset;
+
+	pio->write_overlapped.Offset = pio->read_overlapped.Offset =
+	    uoffset & 0xffffffff;
+	pio->write_overlapped.OffsetHigh = pio->read_overlapped.OffsetHigh =
+	    (uoffset & 0xffffffff00000000) >> 32;
 	 
-	return 0;
+	return offset;
 }
 
 /* fdopen() to be used  on pipe handles */

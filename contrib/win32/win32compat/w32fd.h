@@ -165,7 +165,7 @@ int fileio_write(struct w32_io* pio, const void *buf, size_t max);
 int fileio_fstat(struct w32_io* pio, struct _stat64 *buf);
 int fileio_stat(const char *path, struct _stat64 *buf);
 int fileio_lstat(const char *path, struct _stat64 *buf);
-long fileio_lseek(struct w32_io* pio, unsigned __int64 offset, int origin);
+off_t fileio_lseek(struct w32_io* pio, off_t offset, int origin);
 FILE* fileio_fdopen(struct w32_io* pio, const char *mode);
 ssize_t fileio_readlink(const char *path, char *buf, size_t bufsiz);
 int fileio_symlink(const char *target, const char *linkpath);

@@ -651,8 +651,8 @@ w32_fstat(int fd, struct w32_stat *buf)
 	return fileio_fstat(fd_table.w32_ios[fd], (struct _stat64*)buf);
 }
 
-long
-w32_lseek(int fd, unsigned __int64 offset, int origin)
+off_t
+w32_lseek(int fd, off_t offset, int origin)
 {
 	CHECK_FD(fd);
 	return fileio_lseek(fd_table.w32_ios[fd], offset, origin);
