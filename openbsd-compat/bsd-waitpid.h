@@ -28,9 +28,14 @@
 
 #ifndef HAVE_WAITPID
 /* Clean out any potential issues */
+#undef _W_INT
 #undef WIFEXITED
 #undef WIFSTOPPED
 #undef WIFSIGNALED
+#undef WEXITSTATUS
+#undef WTERMSIG
+#undef WCOREDUMP
+#undef WCOREFLAG
 
 /* Define required functions to mimic a POSIX look and feel */
 #define _W_INT(w)	(*(int*)&(w))	/* convert union wait to int */

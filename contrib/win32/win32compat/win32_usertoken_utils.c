@@ -685,7 +685,7 @@ get_custom_lsa_package()
 	static char *s_lsa_auth_pkg = NULL;
 	static int s_processed = 0;
 	wchar_t *lsa_auth_pkg_w = NULL;
-	int lsa_auth_pkg_len = 0;
+	DWORD lsa_auth_pkg_len = 0;
 	HKEY reg_key = 0;
 	REGSAM mask = STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_WOW64_64KEY;
 

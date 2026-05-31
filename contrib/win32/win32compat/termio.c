@@ -66,7 +66,7 @@ ReadAPCProc(_In_ ULONG_PTR dwParam)
 	WaitForSingleObject(pio->read_overlapped.hEvent, INFINITE);
 	CloseHandle(pio->read_overlapped.hEvent);
 	pio->read_overlapped.hEvent = 0;
-	if (pio->sync_read_status.close_after_read) {
+	if (pio->close_after_read) {
 		if (FILETYPE(pio) != FILE_TYPE_CHAR)
 			CloseHandle(WINHANDLE(pio));
 		if (pio->read_details.buf)
@@ -203,7 +203,7 @@ static unsigned __stdcall
 WriteThread(_In_ LPVOID lpParameter)
 {
 	struct w32_io* pio = (struct w32_io*)lpParameter;
-	char *respbuf = NULL;
+	unsigned char *respbuf = NULL;
 	size_t resplen = 0;	
 	debug5("WriteThread thread, io:%p", pio);
 
@@ -317,7 +317,7 @@ syncio_close(struct w32_io* pio)
 	SleepEx(0, TRUE);
 
 	if (should_defer_free) {
-		pio->sync_read_status.close_after_read = TRUE;
+		pio->close_after_read = TRUE;
 		return 0;
 	}
 

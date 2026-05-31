@@ -35,6 +35,12 @@
 
 struct _children children;
 
+static int
+w32_encode_wait_status(DWORD exit_code)
+{
+	return (int)((exit_code & 0xff) << 8);
+}
+
 int
 register_child(HANDLE child, DWORD pid)
 {
@@ -148,11 +154,12 @@ w32_kill(int pid, int sig)
 }
 
 
-int
+pid_t
 waitpid(int pid, int *status, int options)
 {
-	DWORD index, ret, ret_id, exit_code = 0, timeout = 0;
+	DWORD index, ret, exit_code = 0, timeout = 0;
 	HANDLE process = NULL;
+	pid_t ret_id;
 
 	debug5("waitpid - pid:%d, options:%d", pid, options);
 	if (options & (~WNOHANG)) {
@@ -197,12 +204,12 @@ waitpid(int pid, int *status, int options)
 				debug_assert_internal();//fatal
 		}
 
-		ret_id = children.process_id[index];
+		ret_id = (pid_t)children.process_id[index];
 		GetExitCodeProcess(process, &exit_code);
 		/* process handle will be closed when its removed from list */
 		sw_remove_child_at_index(index);
 		if (status)
-			*status = exit_code;
+			*status = w32_encode_wait_status(exit_code);
 		return ret_id;
 	}
 
@@ -210,10 +217,10 @@ waitpid(int pid, int *status, int options)
 	/* are there any existing zombies */
 	if (children.num_zombies) {
 		/* return one of them */
-		ret_id = children.process_id[children.num_children - 1];
+		ret_id = (pid_t)children.process_id[children.num_children - 1];
 		GetExitCodeProcess(children.handles[children.num_children - 1], &exit_code);
 		if (status)
-			*status = exit_code;
+			*status = w32_encode_wait_status(exit_code);
 		sw_remove_child_at_index(children.num_children - 1);
 		return ret_id;
 	}
@@ -226,12 +233,12 @@ waitpid(int pid, int *status, int options)
 	if ((ret >= WAIT_OBJECT_0_ENHANCED) && (ret < (WAIT_OBJECT_0_ENHANCED + children.num_children))) {
 		index = ret - WAIT_OBJECT_0_ENHANCED;
 		process = children.handles[index];
-		ret_id = children.process_id[index];
+		ret_id = (pid_t)children.process_id[index];
 		GetExitCodeProcess(process, &exit_code);
 		/* process handle will be closed when its removed from list */
 		sw_remove_child_at_index(index);
 		if (status)
-			*status = exit_code;
+			*status = w32_encode_wait_status(exit_code);
 		return ret_id;
 	} else if (ret == WAIT_TIMEOUT_ENHANCED) {
 		/* TODO - assert that WNOHANG  was specified*/
@@ -245,7 +252,7 @@ waitpid(int pid, int *status, int options)
 void
 sw_cleanup_child_zombies()
 {
-	int pid = 1;
+	pid_t pid = 1;
 	while (pid > 0)
 		pid = waitpid(-1, NULL, WNOHANG);
 }

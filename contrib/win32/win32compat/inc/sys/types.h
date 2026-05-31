@@ -47,6 +47,14 @@ typedef _pid_t pid_t;
 typedef long long off_t;
 #endif
 
+#ifndef _OFF64_T_DEFINED
+#define _OFF64_T_DEFINED
+typedef long long _off64_t;
+#ifndef off64_t
+typedef long long off64_t;
+#endif
+#endif
+
 #ifndef _SSIZE_T_DEFINED
 #define _SSIZE_T_DEFINED
 typedef int ssize_t;

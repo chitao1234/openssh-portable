@@ -68,9 +68,9 @@ static struct w32fd_table fd_table;
 /* main thread handle*/
 HANDLE main_thread;
 
-void fd_table_set(struct w32_io* pio, int index);
+static void fd_table_set(struct w32_io* pio, int index);
 
-void fd_decode_state(char*);
+static void fd_decode_state(char*);
 #define POSIX_FD_STATE "c28fc6f98a2c44abbbd89d6a3037d0d9_POSIX_FD_STATE"
 #define POSIX_CHROOTW L"c28fc6f98a2c44abbbd89d6a3037d0d9_POSIX_CHROOT"
 
@@ -542,7 +542,7 @@ w32_open(const char *pathname, int flags, ... /* arg */)
 		return -1;
 	if (flags & O_CREAT) {
 		va_start(valist, flags);
-		mode = va_arg(valist, mode_t);
+		mode = (mode_t)va_arg(valist, int);
 		va_end(valist);
 	}
 

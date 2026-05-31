@@ -107,13 +107,13 @@ struct w32_io {
 		DWORD to_transfer;
 		DWORD transferred;
 		DWORD error;
-		BOOL close_after_read;
 	}sync_read_status;
 	struct {
 		DWORD to_transfer;
 		DWORD transferred;
 		DWORD error;
 	}sync_write_status;
+	BOOL close_after_read;
 
 	/*handle specific internal state context, used by sockets and pipes*/
 	struct {
@@ -125,6 +125,7 @@ struct w32_io {
 #define WINHANDLE(pio) ((pio)->handle)
 #define FILETYPE(pio) (GetFileType(WINHANDLE(pio)))
 extern HANDLE main_thread;
+struct _stat64;
 
 BOOL w32_io_is_blocking(struct w32_io*);
 BOOL w32_io_is_io_available(struct w32_io* pio, BOOL rd);

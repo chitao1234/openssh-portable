@@ -35,11 +35,13 @@
 #define STATUS_BUFFER_OVERFLOW ((NTSTATUS)0x80000005L)
 #endif
 
-typedef struct _UNICODE_STRING {
-	USHORT Length;
-	USHORT MaximumLength;
-	PWSTR Buffer;
-} UNICODE_STRING, *PUNICODE_STRING;
+#ifndef RRF_SUBKEY_WOW6464KEY
+#define RRF_SUBKEY_WOW6464KEY 0
+#endif
+
+#ifndef RRF_SUBKEY_WOW6432KEY
+#define RRF_SUBKEY_WOW6432KEY 0
+#endif
 
 typedef enum _OBJECT_INFORMATION_CLASS {
 	ObjectBasicInformation = 0,
@@ -52,6 +54,8 @@ typedef NTSTATUS (NTAPI *NtQueryObjectType)(
 	PVOID,
 	ULONG,
 	PULONG);
+
+static FARPROC get_proc_address(HMODULE hm, const char *fn);
 
 static wchar_t*
 system32_dir()
@@ -298,7 +302,8 @@ done:
 	return ret;
 }
 
-FARPROC get_proc_address(HMODULE hm, char* fn)
+static FARPROC
+get_proc_address(HMODULE hm, const char *fn)
 {
 	if (hm == NULL) {
 		debug3("GetProcAddress of %s failed with error %d.", fn, GetLastError());

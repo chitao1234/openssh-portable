@@ -2,6 +2,23 @@
 * Missing public definitions from Ntsecapi.h
 */
 
+#if _WIN32_WINNT < 0x0600
+#ifndef MSV1_0_S4U_LOGON_FLAG_CHECK_LOGONHOURS
+#define MSV1_0_S4U_LOGON_FLAG_CHECK_LOGONHOURS 0x2
+#endif
+
+typedef struct _MSV1_0_S4U_LOGON {
+	MSV1_0_LOGON_SUBMIT_TYPE MessageType;
+	ULONG Flags;
+	UNICODE_STRING UserPrincipalName;
+	UNICODE_STRING DomainName;
+} MSV1_0_S4U_LOGON, *PMSV1_0_S4U_LOGON;
+#endif
+
+#ifndef LOGON32_PROVIDER_VIRTUAL
+#define LOGON32_PROVIDER_VIRTUAL 4
+#endif
+
 
 typedef enum _LSA_SID_NAME_MAPPING_OPERATION_TYPE {
 	LsaSidNameMappingOperation_Add,
