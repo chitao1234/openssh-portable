@@ -44,7 +44,7 @@
 #include "w32fd.h"
 #include "tncon.h"
 #include "utf.h"
-#include "debug.h"
+#include "Debug.h"
 #include "tnnet.h"
 #include "misc_internal.h"
 #include "w32api_proxies.h"

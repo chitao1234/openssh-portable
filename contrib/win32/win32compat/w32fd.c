@@ -52,7 +52,7 @@
 #include <shlwapi.h>
 #include <sys/utime.h>
 #include "misc_internal.h"
-#include "debug.h"
+#include "Debug.h"
 #include "userenv.h"
 #include "w32api_proxies.h"
 

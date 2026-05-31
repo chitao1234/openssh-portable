@@ -156,9 +156,9 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\gssapi.h">
       <Filter>inc</Filter>
     </ClInclude>
-    <ClInclude Include="microsofttelemetry.h" />
-    <ClInclude Include="sshtelemetry.h" />
-    <ClInclude Include="sshtelemetryinternal.h" />
+    <ClInclude Include="MicrosoftTelemetry.h" />
+    <ClInclude Include="sshTelemetry.h" />
+    <ClInclude Include="sshTelemetryInternal.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="inc">

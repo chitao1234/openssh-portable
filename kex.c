@@ -43,7 +43,7 @@
 #endif
 
 #ifdef WINDOWS
-#include "sshtelemetry.h"
+#include "sshTelemetry.h"
 #endif
 
 #include "ssh.h"
@@ -1466,4 +1466,3 @@ kex_exchange_identification(struct ssh *ssh, int timeout_ms,
 		errno = oerrno;
 	return r;
 }
-

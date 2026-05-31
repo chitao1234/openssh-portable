@@ -38,7 +38,7 @@
 
 #include "pwd.h"
 #include "sshfileperm.h"
-#include "debug.h"
+#include "Debug.h"
 #include "misc_internal.h"
 #include "config.h"
 

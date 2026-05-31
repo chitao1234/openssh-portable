@@ -30,7 +30,7 @@
 
 #include "utf.h"
 #include "pwd.h"
-#include "debug.h"
+#include "Debug.h"
 #include "gssapi.h"
 
  /*

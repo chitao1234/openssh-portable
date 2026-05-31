@@ -33,7 +33,7 @@
 #include <windows.h>
 #include "utf.h"
 #include "misc_internal.h"
-#include "debug.h"
+#include "Debug.h"
 
 int
 main(int, char **);

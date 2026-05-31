@@ -30,7 +30,7 @@
 
 #include "signal_internal.h"
 #include "sys/wait.h"
-#include "debug.h"
+#include "Debug.h"
 #include "signal.h"
 
 struct _children children;

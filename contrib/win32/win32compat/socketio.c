@@ -36,7 +36,7 @@
 #include "w32fd.h"
 #include "utf.h"
 #include "misc_internal.h"
-#include "debug.h"
+#include "Debug.h"
 
 #define INTERNAL_SEND_BUFFER_SIZE 70*1024 //70KB
 #define INTERNAL_RECV_BUFFER_SIZE 70*1024 //70KB

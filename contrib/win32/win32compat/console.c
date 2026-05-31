@@ -37,7 +37,7 @@
 #include <conio.h>
 #include <io.h>
 
-#include "debug.h"
+#include "Debug.h"
 #include "console.h"
 #include "ansiprsr.h"
 #include "misc_internal.h"

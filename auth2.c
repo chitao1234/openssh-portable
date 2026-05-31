@@ -59,7 +59,7 @@
 #include "digest.h"
 #include "kex.h"
 #ifdef WINDOWS
-#include "sshtelemetry.h"
+#include "sshTelemetry.h"
 #endif
 
 /* import */
@@ -811,4 +811,3 @@ auth2_update_session_info(Authctxt *authctxt, const char *method,
 	if ((r = sshbuf_put_u8(authctxt->session_info, '\n')) != 0)
 		fatal_fr(r, "append");
 }
-

@@ -56,7 +56,7 @@
 #include "sys/ioctl.h"
 #include "fcntl.h"
 #include "utf.h"
-#include "debug.h"
+#include "Debug.h"
 #include "w32fd.h"
 #include "string.h"
 #include "time.h"

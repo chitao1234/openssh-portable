@@ -31,7 +31,7 @@
 #include <errno.h>
 #include "w32fd.h"
 #include "signal_internal.h"
-#include "debug.h"
+#include "Debug.h"
 
 /* Apply caution while changing this order of inclusion of below 2 signal.h headers */
 #include "signal.h"

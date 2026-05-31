@@ -45,7 +45,7 @@
 #include "fcntl.h"
 #include "pwd.h"
 #include "misc_internal.h"
-#include "debug.h"
+#include "Debug.h"
 #include <sddl.h>
 
 /* internal read buffer size */

@@ -50,7 +50,7 @@
 #include <ntstatus.h>
 #include "misc_internal.h"
 #include "lsa_missingdefs.h"
-#include "debug.h"
+#include "Debug.h"
 #include "pwd.h"
 
 #pragma warning(push, 3)

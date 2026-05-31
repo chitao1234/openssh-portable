@@ -1,7 +1,7 @@
 #include <windows.h>
 #include "misc_internal.h"
 #include "unistd.h"
-#include "debug.h"
+#include "Debug.h"
 
 int posix_spawn_internal(pid_t *pidp, const char *path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[], HANDLE user_token, BOOLEAN prepend_module_path);
 

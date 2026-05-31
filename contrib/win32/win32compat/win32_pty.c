@@ -29,7 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "debug.h"
+#include "Debug.h"
 #include "fcntl.h"
 #include "utf.h"
 #include "misc_internal.h"

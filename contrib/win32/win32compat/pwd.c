@@ -45,7 +45,7 @@
 #include "grp.h"
 #include "utf.h"
 #include "misc_internal.h"
-#include "debug.h"
+#include "Debug.h"
 
 static struct passwd pw;
 static char* pw_shellpath = NULL;

@@ -30,7 +30,7 @@
 
 #include <windows.h>
 #include "utf.h"
-#include "debug.h"
+#include "Debug.h"
 
 /*on error returns NULL and sets errno*/
 wchar_t *
@@ -60,4 +60,3 @@ utf16_to_utf8(const wchar_t* utf16)
 	
 	return utf8;
 }
-

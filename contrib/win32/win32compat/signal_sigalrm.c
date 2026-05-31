@@ -31,7 +31,7 @@
 #include "signal_internal.h"
 #include "sys/time.h"
 #include "signal.h"
-#include "debug.h"
+#include "Debug.h"
 #include "w32api_proxies.h"
 
 struct _timer_info timer_info;
