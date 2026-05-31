@@ -69,6 +69,7 @@
 #define TCSADRAIN	1
 #define TCSAFLUSH	2
 #define TCSANOW		3
+#define TCSASOFT	0
 
 /* Compatibility header to allow some termios functionality to compile without #ifdefs */
 
@@ -106,5 +107,12 @@ struct termios
   speed_t	c_ispeed;
   speed_t	c_ospeed;
 };
+
+int tcgetattr(int, struct termios *);
+int tcsetattr(int, int, const struct termios *);
+speed_t cfgetospeed(const struct termios *);
+speed_t cfgetispeed(const struct termios *);
+int cfsetospeed(struct termios *, speed_t);
+int cfsetispeed(struct termios *, speed_t);
 
 #endif
