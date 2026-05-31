@@ -52,19 +52,45 @@ void* w32_fd_to_handle(int fd);
 #define O_ACCMODE			0x0003
 #endif
 #define O_NONBLOCK			0x0004  /*io operations wont block*/
+#ifndef S_IXUSR
 # define S_IXUSR			0000100	/* execute/search permission, */
+#endif
+#ifndef S_IXGRP
 # define S_IXGRP			0000010	/* execute/search permission, */
+#endif
+#ifndef S_IXOTH
 # define S_IXOTH			0000001	/* execute/search permission, */
+#endif
+#ifndef _S_IWUSR
 # define _S_IWUSR			0000200	/* write permission, */
+#endif
+#ifndef S_IWUSR
 # define S_IWUSR			_S_IWUSR	/* write permission, owner */
+#endif
+#ifndef S_IWGRP
 # define S_IWGRP			0000020	/* write permission, group */
+#endif
+#ifndef S_IWOTH
 # define S_IWOTH			0000002	/* write permission, other */
+#endif
+#ifndef S_IRUSR
 # define S_IRUSR			0000400	/* read permission, owner */
+#endif
+#ifndef S_IRGRP
 # define S_IRGRP			0000040	/* read permission, group */
+#endif
+#ifndef S_IROTH
 # define S_IROTH			0000004	/* read permission, other */
+#endif
+#ifndef S_IRWXU
 # define S_IRWXU			0000700	/* read, write, execute */
+#endif
+#ifndef S_IRWXG
 # define S_IRWXG			0000070	/* read, write, execute */
+#endif
+#ifndef S_IRWXO
 # define S_IRWXO			0000007	/* read, write, execute */
+#endif
 
 /* 
  * File types. Note that the values are different from similar variants 
