@@ -813,7 +813,7 @@ SK_DUMMY_OBJS=\
 
 SK_DUMMY_LIBRARY=@SK_DUMMY_LIBRARY@
 
-.c.lo: Makefile.in config.h
+%.lo: %.c Makefile.in config.h
 	$(CC) $(CFLAGS_NOPIE) $(PICFLAG) $(CPPFLAGS) -c $< -o $@
 
 regress/misc/sk-dummy/sk-dummy.so: $(SK_DUMMY_OBJS)
