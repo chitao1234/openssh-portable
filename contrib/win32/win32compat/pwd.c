@@ -59,7 +59,8 @@ static int
 set_defaultshell()
 {
 	HKEY reg_key = 0;
-	int tmp_len, ret = -1;
+	DWORD tmp_len;
+	int ret = -1;
 	REGSAM mask = STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_WOW64_64KEY;
 	wchar_t path_buf[PATH_MAX], option_buf[PATH_MAX], arg_buf[PATH_MAX];
 	char *pw_shellpath_local = NULL, *command_option_local = NULL, *shell_arguments_local = NULL;
@@ -74,18 +75,18 @@ set_defaultshell()
 	option_buf[0] = L'\0';
 	arg_buf[0] = L'\0';
 
-	tmp_len = _countof(path_buf);
+	tmp_len = sizeof(path_buf);
 	if ((RegOpenKeyExW(HKEY_LOCAL_MACHINE, SSH_REGISTRY_ROOT, 0, mask, &reg_key) == ERROR_SUCCESS) &&
 	    (RegQueryValueExW(reg_key, L"DefaultShell", 0, NULL, (LPBYTE)path_buf, &tmp_len) == ERROR_SUCCESS) &&
 	    (path_buf[0] != L'\0')) {
 		/* fetched default shell path from registry */
-		tmp_len = _countof(option_buf);
+		tmp_len = sizeof(option_buf);
 		DWORD size = sizeof(DWORD);
 		DWORD escape_option = 1;
 		if (RegQueryValueExW(reg_key, L"DefaultShellCommandOption", 0, NULL, (LPBYTE)option_buf, &tmp_len) != ERROR_SUCCESS)
 			option_buf[0] = L'\0';
 
-		tmp_len = _countof(arg_buf);
+		tmp_len = sizeof(arg_buf);
 		if (RegQueryValueExW(reg_key, L"DefaultShellArguments", 0, NULL, (LPBYTE)arg_buf, &tmp_len) != ERROR_SUCCESS)
 			arg_buf[0] = L'\0';
 
