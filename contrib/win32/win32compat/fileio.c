@@ -84,6 +84,74 @@ struct createFile_flags {
 int syncio_initiate_read(struct w32_io* pio);
 int syncio_initiate_write(struct w32_io* pio, DWORD num_bytes);
 int syncio_close(struct w32_io* pio);
+BOOL fileio_is_io_available(struct w32_io* pio, BOOL rd);
+
+static void
+syncio_complete_read(struct w32_io *pio)
+{
+	if (pio->read_overlapped.hEvent != NULL) {
+		WaitForSingleObject(pio->read_overlapped.hEvent, INFINITE);
+		CloseHandle(pio->read_overlapped.hEvent);
+		pio->read_overlapped.hEvent = NULL;
+	}
+	pio->read_details.error = pio->sync_read_status.error;
+	pio->read_details.remaining = pio->sync_read_status.transferred;
+	pio->read_details.completed = 0;
+	pio->read_details.pending = FALSE;
+}
+
+static void
+syncio_complete_write(struct w32_io *pio)
+{
+	if (pio->write_overlapped.hEvent != NULL) {
+		WaitForSingleObject(pio->write_overlapped.hEvent, INFINITE);
+		CloseHandle(pio->write_overlapped.hEvent);
+		pio->write_overlapped.hEvent = NULL;
+	}
+	pio->write_details.error = pio->sync_write_status.error;
+	if (pio->write_details.remaining >= pio->sync_write_status.transferred)
+		pio->write_details.remaining -= pio->sync_write_status.transferred;
+	else
+		pio->write_details.remaining = 0;
+	pio->write_details.completed = 0;
+	pio->write_details.pending = FALSE;
+}
+
+static int
+wait_for_syncio_worker(struct w32_io *pio, BOOL rd, DWORD milli_seconds)
+{
+	HANDLE worker = rd ? pio->read_overlapped.hEvent : pio->write_overlapped.hEvent;
+
+	if (worker == NULL || worker == INVALID_HANDLE_VALUE)
+		return wait_for_any_event(NULL, 0, milli_seconds);
+
+	for (;;) {
+		HANDLE events[] = { worker };
+		int ret = wait_for_any_event(events, 1, milli_seconds);
+
+		if (ret == -1 && errno != EINTR)
+			return -1;
+
+		/* Let queued APC completions run before falling back to the worker. */
+		SleepEx(0, TRUE);
+
+		if (rd && pio->read_details.pending &&
+		    WaitForSingleObject(worker, 0) == WAIT_OBJECT_0)
+			syncio_complete_read(pio);
+		if (!rd && pio->write_details.pending &&
+		    WaitForSingleObject(worker, 0) == WAIT_OBJECT_0)
+			syncio_complete_write(pio);
+
+		if (!rd && !pio->write_details.pending)
+			return 0;
+		if (rd && fileio_is_io_available(pio, TRUE))
+			return 0;
+		if (ret == 0 && milli_seconds != INFINITE)
+			return 0;
+		if (ret == -1 && errno == EINTR)
+			return -1;
+	}
+}
 
 /* maps Win32 error to errno */
 int
@@ -593,7 +661,7 @@ fileio_read(struct w32_io* pio, void *dst, size_t max_bytes)
 		if (w32_io_is_blocking(pio)) {
 			debug4("read - io is pending, blocking call made, io:%p", pio);
 			while (fileio_is_io_available(pio, TRUE) == FALSE) {
-				if (-1 == wait_for_any_event(NULL, 0, INFINITE))
+				if (-1 == wait_for_syncio_worker(pio, TRUE, INFINITE))
 					return -1;
 			}
 		}
@@ -631,7 +699,7 @@ fileio_read(struct w32_io* pio, void *dst, size_t max_bytes)
 
 		if (w32_io_is_blocking(pio)) {
 			while (fileio_is_io_available(pio, TRUE) == FALSE) {
-				if (-1 == wait_for_any_event(NULL, 0, INFINITE))
+				if (-1 == wait_for_syncio_worker(pio, TRUE, INFINITE))
 					return -1;
 			}
 		}
@@ -735,7 +803,7 @@ fileio_write(struct w32_io* pio, const void *buf, size_t max_bytes)
 		if (w32_io_is_blocking(pio)) {
 			debug4("write - io pending, blocking call made, io:%p", pio);
 			while (pio->write_details.pending)
-				if (wait_for_any_event(NULL, 0, INFINITE) == -1)
+				if (wait_for_syncio_worker(pio, FALSE, INFINITE) == -1)
 					return -1;
 		} else {
 			errno = EAGAIN;
@@ -796,7 +864,7 @@ fileio_write(struct w32_io* pio, const void *buf, size_t max_bytes)
 
 	if (w32_io_is_blocking(pio)) {
 		while (pio->write_details.pending) {
-			if (wait_for_any_event(NULL, 0, INFINITE) == -1) {
+			if (wait_for_syncio_worker(pio, FALSE, INFINITE) == -1) {
 				/* if interrupted but write has completed, we are good*/
 				if ((errno != EINTR) || (pio->write_details.pending))
 					return -1;
@@ -1123,7 +1191,7 @@ fileio_close(struct w32_io* pio)
 	* scenarios.
 	*/
 	while (pio->write_details.pending)
-		if (0 != wait_for_any_event(NULL, 0, INFINITE))
+		if (0 != wait_for_syncio_worker(pio, FALSE, INFINITE))
 			return -1;
 
 	CancelIo(WINHANDLE(pio));

@@ -59,6 +59,10 @@ static VOID CALLBACK
 ReadAPCProc(_In_ ULONG_PTR dwParam)
 {
 	struct w32_io* pio = (struct w32_io*)dwParam;
+
+	if (pio->read_overlapped.hEvent == NULL)
+		return;
+
 	debug5("TermRead CB - io:%p, bytes: %d, pending: %d, error: %d", pio, pio->read_details.completed,
 		pio->read_details.pending, pio->sync_read_status.error);
 	pio->read_details.error = pio->sync_read_status.error;
@@ -187,6 +191,10 @@ static VOID CALLBACK
 WriteAPCProc(_In_ ULONG_PTR dwParam)
 {
 	struct w32_io* pio = (struct w32_io*)dwParam;
+
+	if (pio->write_overlapped.hEvent == NULL)
+		return;
+
 	debug5("TermWrite CB - io:%p, bytes: %d, pending: %d, error: %d", pio, pio->write_details.completed,
 		pio->write_details.pending, pio->sync_write_status.error);
 	pio->write_details.error = pio->sync_write_status.error;
