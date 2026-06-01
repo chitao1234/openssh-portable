@@ -113,6 +113,9 @@ void	 sock_set_v6only(int);
 
 #ifdef WINDOWS
 void	 convertToForwardslash(char *);
+void	 convertToBackslash(char *);
+int	 is_bash_test_env(void);
+int	 bash_to_win_path(const char *, char *, const size_t);
 int	 is_absolute_path(const char *);
 #endif
 

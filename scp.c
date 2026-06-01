@@ -1206,7 +1206,7 @@ brace_expand(const char *pattern, char ***patternsp, size_t *npatternsp)
 
 static struct sftp_conn *
 do_sftp_connect(char *host, char *user, int port, char *sftp_direct,
-   int *reminp, int *remoutp, int *pidp)
+   int *reminp, int *remoutp, pid_t *pidp)
 {
 	if (sftp_direct == NULL) {
 		if (do_cmd(ssh_program, host, user, port, 1, "sftp",
