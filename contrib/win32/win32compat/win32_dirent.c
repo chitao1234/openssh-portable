@@ -273,6 +273,9 @@ basename(char *path)
 	const char *endp;
 	static char bname[PATH_MAX];
 
+	if (!path)
+		return ".";
+
 	/* Find any trailing slashes */
 	endp = path + strlen(path) - 1;
 	while (endp > path && (*endp == '/' || *endp == '\\'))
@@ -284,8 +287,6 @@ basename(char *path)
 	}
 	bname[path_len] = '\0';
 
-	if (!path)
-		return ".";
 	pdest = strrchr(bname, '/');
 	if (pdest)
 		return (pdest + 1);
