@@ -33,6 +33,7 @@
 
 #define UMDF_USING_NTSTATUS 
 #define SECURITY_WIN32
+#include <winsock2.h>
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>

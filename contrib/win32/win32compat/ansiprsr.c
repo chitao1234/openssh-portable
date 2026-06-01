@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#include <winsock2.h>
 #include <windows.h>
 
 #include "ansiprsr.h"

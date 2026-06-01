@@ -1,4 +1,5 @@
 #pragma once
+#include <winsock2.h>
 #include <windows.h>
 #define RTLD_NOW 0
 

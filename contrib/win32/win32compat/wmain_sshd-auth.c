@@ -32,6 +32,7 @@
 
 /* disable inclusion of compatability defitnitions in CRT headers */
 #define __STDC__ 1
+#include <winsock2.h>
 #include <windows.h>
 #include <wchar.h>
 #include <lm.h>

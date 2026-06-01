@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <winsock2.h>
 #include <windows.h>
 #include <conio.h>
 #include <io.h>

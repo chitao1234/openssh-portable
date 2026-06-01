@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <winsock2.h>
 #include <windows.h>
 #define SECURITY_WIN32
 #include <security.h>

@@ -4,6 +4,7 @@
 
 #include "includes.h"
 
+#include <winsock2.h>
 #include <windows.h>
 #include <errno.h>
 #include <string.h>

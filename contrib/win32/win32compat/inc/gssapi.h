@@ -34,6 +34,7 @@
   * specification and intended operation.
   */
 
+#include <winsock2.h>
 #include <windows.h>
 #include <stdint.h>
 

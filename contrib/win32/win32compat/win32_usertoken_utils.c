@@ -34,6 +34,7 @@
 */
 #define SECURITY_WIN32
 #define UMDF_USING_NTSTATUS 
+#include <winsock2.h>
 #include <windows.h>
 #include <userenv.h>
 #include <ntsecapi.h>

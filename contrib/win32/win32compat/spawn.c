@@ -3,6 +3,7 @@
 *
 * Implementation of POSIX spawn family of functions
 */
+#include <winsock2.h>
 #include <windows.h>
 #include "spawn.h"
 #include "unistd.h"

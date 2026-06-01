@@ -30,6 +30,7 @@
 * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <winsock2.h>
 #include <windows.h>
 #include "utf.h"
 #include "misc_internal.h"

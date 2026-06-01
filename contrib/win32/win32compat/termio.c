@@ -39,6 +39,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <winsock2.h>
 #include <windows.h>
 #include <process.h>
 #include "w32fd.h"
