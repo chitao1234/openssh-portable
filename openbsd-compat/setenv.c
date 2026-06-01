@@ -38,7 +38,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef WINDOWS
 extern char **environ;
+#endif
 #ifndef HAVE_SETENV
 static char **lastenv;				/* last value of environ */
 #endif
@@ -57,7 +59,9 @@ static char **lastenv;				/* last value of environ */
 static char *
 __findenv(const char *name, int len, int *offset)
 {
+#ifndef WINDOWS
 	extern char **environ;
+#endif
 	int i;
 	const char *np;
 	char **p, *cp;
@@ -225,4 +229,3 @@ unsetenv(const char *name)
 #endif /* HAVE_UNSETENV */
 
 #endif /* !defined(HAVE_SETENV) || !defined(HAVE_UNSETENV) */
-

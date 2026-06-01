@@ -1886,7 +1886,9 @@ mux_client_request_session(int fd)
 	char *e;
 	const char *term = NULL;
 	u_int i, echar, rid, sid, esid, exitval, type, exitval_seen;
+#ifndef WINDOWS
 	extern char **environ;
+#endif
 	int r, rawmode = 0;
 
 	debug3_f("entering");

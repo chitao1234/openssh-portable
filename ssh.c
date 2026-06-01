@@ -2197,7 +2197,9 @@ check_agent_present(void)
 static void
 ssh_session2_setup(struct ssh *ssh, int id, int success, void *arg)
 {
+#ifndef WINDOWS
 	extern char **environ;
+#endif
 	const char *display, *term;
 	int r, interactive = tty_flag;
 	char *proto = NULL, *data = NULL;
