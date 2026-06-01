@@ -289,9 +289,8 @@ timespec_to_nsec(const struct timespec *req)
 	return sec * NSEC_IN_SEC + req->tv_nsec;
 }
 
-
 int
-nanosleep(const struct timespec *req, struct timespec *rem)
+w32_nanosleep(const struct timespec *req, struct timespec *rem)
 {
 	HANDLE timer;
 	LARGE_INTEGER li;
