@@ -901,7 +901,10 @@ fileio_stat_or_lstat_internal(const char *path, struct _stat64 *buf, int do_lsta
 	buf->st_uid = 0; /* UNIX - specific; has no meaning on windows */
 	buf->st_nlink = 1; /* number of hard links. Always 1 on non - NTFS file systems.*/
 	buf->st_mode |= file_attr_to_st_mode(wpath, attributes.dwFileAttributes);
-	buf->st_size = attributes.nFileSizeLow | (((off_t)attributes.nFileSizeHigh) << 32);
+	ULARGE_INTEGER file_size;
+	file_size.LowPart = attributes.nFileSizeLow;
+	file_size.HighPart = attributes.nFileSizeHigh;
+	buf->st_size = file_size.QuadPart;
 	if (wcslen(wpath) > 1 && iswalpha(*wpath) && (*(wpath + 1) == ':'))
 		buf->st_dev = buf->st_rdev = towupper(*wpath) - L'A'; /* drive num */
 	else
