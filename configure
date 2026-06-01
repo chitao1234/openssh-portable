@@ -5862,7 +5862,7 @@ case "$host" in
 	WIN32COMPAT_LIB="contrib/win32/win32compat/${LIBWIN32COMPAT}"
 	WIN32COMPAT_CPPFLAGS="-DWIN32 -DWINDOWS -D_WINDOWS -D_CRT_DECLARE_NONSTDC_NAMES=0 -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS -D_WINSOCK_DEPRECATED_NO_WARNINGS -D_WIN32_WINNT=0x0501 -DGSSAPI=1 -DGSSAPI_SSPI=1 -DHAVE_GSSAPI_H=1"
 	WIN32COMPAT_MAKE_CPPFLAGS="-I\$(top_srcdir)/contrib/win32/win32compat/inc -I\$(top_srcdir)/contrib/win32/win32compat"
-	CPPFLAGS="-I${srcdir}/contrib/win32/win32compat/inc $CPPFLAGS"
+	CPPFLAGS="-D_TIME_BITS=64 -I${srcdir}/contrib/win32/win32compat/inc $CPPFLAGS"
 	LIBS="$LIBS -lws2_32 -lnetapi32 -lsecur32 -luserenv -lshlwapi -ladvapi32 -lshell32 -lole32 -lcrypt32 -lrpcrt4"
 	GROUPACCESS_O=win32_groupaccess.o
 
