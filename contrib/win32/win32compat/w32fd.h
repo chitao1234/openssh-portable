@@ -131,6 +131,9 @@ struct _stat64;
 BOOL w32_io_is_blocking(struct w32_io*);
 BOOL w32_io_is_io_available(struct w32_io* pio, BOOL rd);
 int wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds);
+void *w32_fd_to_handle(int fd);
+int w32_pipe(int *pfds);
+ssize_t w32_write(int fd, const void *buf, size_t max);
 
 /*POSIX mimic'ing socket API and socket helper API*/
 int socketio_initialize();

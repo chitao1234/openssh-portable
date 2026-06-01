@@ -43,6 +43,7 @@
 #include <stdlib.h>
 
 #include "w32fd.h"
+#include <wincrypt.h>
 #include "signal_internal.h"
 #include <stdarg.h>
 #include <errno.h>

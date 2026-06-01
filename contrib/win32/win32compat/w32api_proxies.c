@@ -30,6 +30,7 @@
 #include "w32api_proxies.h"
 #include "Debug.h"
 #include "misc_internal.h"
+#include <stdlib.h>
 
 #ifndef STATUS_BUFFER_OVERFLOW
 #define STATUS_BUFFER_OVERFLOW ((NTSTATUS)0x80000005L)

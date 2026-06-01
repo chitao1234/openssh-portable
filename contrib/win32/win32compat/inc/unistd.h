@@ -68,7 +68,9 @@ off_t w32_lseek(int fd, off_t offset, int origin);
 #define getdtablesize() MAX_FDS
 
 int w32_gethostname(char *, size_t);
-#define gethostname w32_gethostname
+#ifndef WIN32COMPAT_IMPL
+# define gethostname w32_gethostname
+#endif
 
 int w32_fsync(int fd);
 #define fsync(a) w32_fsync((a))

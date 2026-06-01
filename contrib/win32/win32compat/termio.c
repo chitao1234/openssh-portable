@@ -42,6 +42,7 @@
 #include <winsock2.h>
 #include <windows.h>
 #include <process.h>
+#include <stdlib.h>
 #include "w32fd.h"
 #include "tncon.h"
 #include "utf.h"

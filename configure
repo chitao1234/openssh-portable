@@ -691,6 +691,7 @@ LIBOBJS
 LD
 GROUPACCESS_O
 WIN32COMPAT_LIB
+WIN32COMPAT_IMPL_CPPFLAGS
 WIN32COMPAT_MAKE_CPPFLAGS
 WIN32COMPAT_CPPFLAGS
 LIBWIN32COMPAT
@@ -5848,8 +5849,10 @@ fi
 LIBWIN32COMPAT=
 WIN32COMPAT_CPPFLAGS=
 WIN32COMPAT_MAKE_CPPFLAGS=
+WIN32COMPAT_IMPL_CPPFLAGS=
 WIN32COMPAT_LIB=
 GROUPACCESS_O=groupaccess.o
+
 
 
 
@@ -5860,22 +5863,48 @@ case "$host" in
 *-*-mingw*)
 	LIBWIN32COMPAT="libwin32compat.a"
 	WIN32COMPAT_LIB="contrib/win32/win32compat/${LIBWIN32COMPAT}"
-	WIN32COMPAT_CPPFLAGS="-DWIN32 -DWINDOWS -D_WINDOWS -D_CRT_DECLARE_NONSTDC_NAMES=0 -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS -D_WINSOCK_DEPRECATED_NO_WARNINGS -D_WIN32_WINNT=0x0501 -DGSSAPI=1 -DGSSAPI_SSPI=1 -DHAVE_GSSAPI_H=1"
+	WIN32COMPAT_CPPFLAGS="-DWIN32_LEAN_AND_MEAN=1 -DWIN32 -DWINDOWS -D_WINDOWS -D_CRT_DECLARE_NONSTDC_NAMES=0 -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS -D_WINSOCK_DEPRECATED_NO_WARNINGS -D_WIN32_WINNT=0x0501 -DGSSAPI=1 -DGSSAPI_SSPI=1 -DHAVE_GSSAPI_H=1"
 	WIN32COMPAT_MAKE_CPPFLAGS="-I\$(top_srcdir)/contrib/win32/win32compat/inc -I\$(top_srcdir)/contrib/win32/win32compat"
+	WIN32COMPAT_IMPL_CPPFLAGS="-DWIN32COMPAT_IMPL ${WIN32COMPAT_MAKE_CPPFLAGS}"
 	CPPFLAGS="-D_TIME_BITS=64 -I${srcdir}/contrib/win32/win32compat/inc $CPPFLAGS"
 	LIBS="$LIBS -lws2_32 -lnetapi32 -lsecur32 -luserenv -lshlwapi -ladvapi32 -lshell32 -lole32 -lcrypt32 -lrpcrt4"
 	GROUPACCESS_O=win32_groupaccess.o
 
-	# Seed MinGW results for wrapper-backed headers and cross-size probes.
+	# Match the Visual Studio Win32 config instead of probing the build host
+	# or treating public wrapper redirects as native platform features.
+
+printf "%s\n" "#define WIN32_LEAN_AND_MEAN 1" >>confdefs.h
+
+
+printf "%s\n" "#define SUPPORT_CRLF 1" >>confdefs.h
+
+
+printf "%s\n" "#define BROKEN_READV_COMPARISON 1" >>confdefs.h
+
+
+printf "%s\n" "#define GETPGRP_VOID 1" >>confdefs.h
+
+
+printf "%s\n" "#define BROKEN_SYS_TERMIO_H 1" >>confdefs.h
+
+
+printf "%s\n" "#define _STRUCT_WINSIZE 1" >>confdefs.h
+
+	ac_cv_header_fcntl_h=no
 	ac_cv_header_netdb_h=yes
 	ac_cv_header_poll_h=yes
+	ac_cv_header_sys_cdefs_h=no
 	ac_cv_header_sys_select_h=yes
+	ac_cv_header_sys_sysmacros_h=no
+	ac_cv_header_vis_h=yes
 	ac_cv_func_fnmatch=yes
 	ac_cv_func_freeaddrinfo=yes
 	ac_cv_func_gai_strerror=yes
 	ac_cv_func_getaddrinfo=yes
+	ac_cv_func_getpgrp=no
 	ac_cv_func_getgrouplist=yes
 	ac_cv_func_getnameinfo=yes
+	ac_cv_func_inet_aton=yes
 	ac_cv_func_inet_ntoa=yes
 	ac_cv_func_inet_ntop=yes
 	ac_cv_func_group_from_gid=yes
@@ -5885,6 +5914,7 @@ case "$host" in
 	ac_cv_func_realpath=yes
 	ac_cv_func_setenv=yes
 	ac_cv_func_statvfs=yes
+	ac_cv_func_strerror=no
 	ac_cv_func_strsignal=yes
 	ac_cv_func_strmode=yes
 	ac_cv_func_tcgetpgrp=yes
@@ -15210,16 +15240,24 @@ fi
 
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for /proc/pid/fd directory" >&5
 printf %s "checking for /proc/pid/fd directory... " >&6; }
-if test -d "/proc/$$/fd" ; then
+case "$host" in
+*-*-mingw*)
+	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+	;;
+*)
+	if test -d "/proc/$$/fd" ; then
 
 printf "%s\n" "#define HAVE_PROC_PID 1" >>confdefs.h
 
-	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf "%s\n" "yes" >&6; }
-else
-	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+	else
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
-fi
+	fi
+	;;
+esac
 
 # Check whether user wants to use ldns
 LDNS_MSG="no"

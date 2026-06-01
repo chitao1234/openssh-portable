@@ -7,7 +7,7 @@ vpath %.c @srcdir@
 CC=@CC@
 LD=@LD@
 CFLAGS=@CFLAGS@
-CPPFLAGS=-I. -I../../.. -I$(srcdir) -I$(top_srcdir) -I$(top_srcdir)/contrib/win32/openssh @WIN32COMPAT_MAKE_CPPFLAGS@ @WIN32COMPAT_CPPFLAGS@ @CPPFLAGS@ @DEFS@
+CPPFLAGS=-I. -I../../.. -I$(srcdir) -I$(top_srcdir) -I$(top_srcdir)/contrib/win32/openssh @WIN32COMPAT_IMPL_CPPFLAGS@ @WIN32COMPAT_CPPFLAGS@ @CPPFLAGS@ @DEFS@
 LIBS=@LIBS@
 AR=@AR@
 RANLIB=@RANLIB@

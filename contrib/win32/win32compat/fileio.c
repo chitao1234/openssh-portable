@@ -37,10 +37,12 @@
 #include <io.h>
 #include <errno.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include "direct.h"
 #include <wctype.h>
 
 #include "w32fd.h"
+#include <winioctl.h>
 #include "utf.h"
 #include "fcntl.h"
 #include "pwd.h"

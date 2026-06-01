@@ -33,7 +33,9 @@
 #include "agent-request.h"
 #include "config.h"
 #include "w32api_proxies.h"
+#include <dpapi.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include "digest.h"
 #include "match.h"
 #include "sshkey.h"

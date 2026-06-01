@@ -51,7 +51,9 @@ void* w32_fd_to_handle(int fd);
 #ifndef O_ACCMODE
 #define O_ACCMODE			0x0003
 #endif
-#define O_NONBLOCK			0x0004  /*io operations wont block*/
+#ifndef O_NONBLOCK
+# define O_NONBLOCK			0x0004  /*io operations wont block*/
+#endif
 #ifndef S_IXUSR
 # define S_IXUSR			0000100	/* execute/search permission, */
 #endif

@@ -21,51 +21,83 @@
 
 /*network i/o*/
 int w32_socket(int domain, int type, int protocol);
-#define socket(a,b,c)		w32_socket((a), (b), (c))
+#ifndef WIN32COMPAT_IMPL
+# define socket(a,b,c)		w32_socket((a), (b), (c))
+#endif
 
 int w32_accept(int fd, struct sockaddr* addr, int* addrlen);
-#define accept(a,b,c)		w32_accept((a), (b), (c))
+#ifndef WIN32COMPAT_IMPL
+# define accept(a,b,c)		w32_accept((a), (b), (c))
+#endif
 
 int w32_setsockopt(int fd, int level, int optname, const void* optval, int optlen);
-#define setsockopt(a,b,c,d,e)	w32_setsockopt((a), (b), (c), (d), (e))
+#ifndef WIN32COMPAT_IMPL
+# define setsockopt(a,b,c,d,e)	w32_setsockopt((a), (b), (c), (d), (e))
+#endif
 
 int w32_getsockopt(int fd, int level, int optname, void* optval, int* optlen);
-#define getsockopt(a,b,c,d,e)	w32_getsockopt((a), (b), (c), (d), (e))
+#ifndef WIN32COMPAT_IMPL
+# define getsockopt(a,b,c,d,e)	w32_getsockopt((a), (b), (c), (d), (e))
+#endif
 
 int w32_getsockname(int fd, struct sockaddr* name, int* namelen);
-#define getsockname(a,b,c)	w32_getsockname((a), (b), (c))
+#ifndef WIN32COMPAT_IMPL
+# define getsockname(a,b,c)	w32_getsockname((a), (b), (c))
+#endif
 
 int w32_getpeername(int fd, struct sockaddr* name, int* namelen);
-#define getpeername(a,b,c)	w32_getpeername((a), (b), (c))
+#ifndef WIN32COMPAT_IMPL
+# define getpeername(a,b,c)	w32_getpeername((a), (b), (c))
+#endif
 
 int w32_listen(int fd, int backlog);
-#define listen(a,b)		    w32_listen((a), (b))
+#ifndef WIN32COMPAT_IMPL
+# define listen(a,b)		w32_listen((a), (b))
+#endif
 
 int w32_bind(int fd, const struct sockaddr *name, int namelen);
-#define bind(a,b,c)		    w32_bind((a), (b), (c))
+#ifndef WIN32COMPAT_IMPL
+# define bind(a,b,c)		w32_bind((a), (b), (c))
+#endif
 
 int w32_connect(int fd, const struct sockaddr* name, int namelen);
-#define connect(a,b,c)		w32_connect((a), (b), (c))
+#ifndef WIN32COMPAT_IMPL
+# define connect(a,b,c)		w32_connect((a), (b), (c))
+#endif
 
 int w32_recv(int fd, void *buf, size_t len, int flags);
-#define recv(a,b,c,d)		w32_recv((a), (b), (c), (d))
+#ifndef WIN32COMPAT_IMPL
+# define recv(a,b,c,d)		w32_recv((a), (b), (c), (d))
+#endif
 
 int w32_send(int fd, const void *buf, size_t len, int flags);
-#define send(a,b,c,d)		w32_send((a), (b), (c), (d))
+#ifndef WIN32COMPAT_IMPL
+# define send(a,b,c,d)		w32_send((a), (b), (c), (d))
+#endif
 
 int w32_shutdown(int fd, int how);
-#define shutdown(a,b)		w32_shutdown((a), (b))
+#ifndef WIN32COMPAT_IMPL
+# define shutdown(a,b)		w32_shutdown((a), (b))
+#endif
 
 int w32_socketpair(int domain, int type, int protocol, int sv[2]);
-#define socketpair(a,b,c,d)	w32_socketpair((a), (b), (c), (d))
+#ifndef WIN32COMPAT_IMPL
+# define socketpair(a,b,c,d)	w32_socketpair((a), (b), (c), (d))
+#endif
 
 void w32_freeaddrinfo(struct addrinfo *);
-#define freeaddrinfo        w32_freeaddrinfo
+#ifndef WIN32COMPAT_IMPL
+# define freeaddrinfo		w32_freeaddrinfo
+#endif
 
 int w32_getaddrinfo(const char *, const char *,
 	const struct addrinfo *, struct addrinfo **);
-#define getaddrinfo         w32_getaddrinfo
+#ifndef WIN32COMPAT_IMPL
+# define getaddrinfo		w32_getaddrinfo
+#endif
 
 int w32_getnameinfo(const struct sockaddr *, size_t, char *, size_t,
 	char *, size_t, int);
-#define getnameinfo         w32_getnameinfo
+#ifndef WIN32COMPAT_IMPL
+# define getnameinfo		w32_getnameinfo
+#endif

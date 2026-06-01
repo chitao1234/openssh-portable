@@ -5,6 +5,8 @@
 */
 #include <winsock2.h>
 #include <windows.h>
+#include <errno.h>
+#include <string.h>
 #include "spawn.h"
 #include "unistd.h"
 

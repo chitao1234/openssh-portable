@@ -6,6 +6,7 @@
 #include "../../../sshpty.h"
 #include "misc.h"
 #include "misc_internal.h"
+#include "w32fd.h"
 
 /* 
  * Windows versions of pty_*. Some of them are NO-OPs and should go 

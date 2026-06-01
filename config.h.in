@@ -87,6 +87,9 @@
 /* strnvis detected broken */
 #undef BROKEN_STRNVIS
 
+/* Define if sys/termio.h is broken */
+#undef BROKEN_SYS_TERMIO_H
+
 /* tcgetattr with ICANON may hang */
 #undef BROKEN_TCGETATTR_ICANON
 
@@ -1927,6 +1930,9 @@
 /* Define if you want a different $PATH for the superuser */
 #undef SUPERUSER_PATH
 
+/* Define to support CRLF line endings */
+#undef SUPPORT_CRLF
+
 /* syslog_r function is safe to use in in a signal handler */
 #undef SYSLOG_R_SAFE_IN_SIGHAND
 
@@ -1983,6 +1989,9 @@
 
 /* compiler supports variable length arrays */
 #undef VARIABLE_LENGTH_ARRAYS
+
+/* Define to exclude rarely-used Windows headers */
+#undef WIN32_LEAN_AND_MEAN
 
 /* Define if building for Windows */
 #undef WINDOWS
@@ -2044,6 +2053,9 @@
 
 /* Specify location of ssh.pid */
 #undef _PATH_SSH_PIDDIR
+
+/* Define if struct winsize is already declared */
+#undef _STRUCT_WINSIZE
 
 /* Define if we don't have struct __res_state in resolv.h */
 #undef __res_state

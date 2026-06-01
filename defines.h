@@ -162,7 +162,7 @@ enum
 #endif
 #endif
 
-#if defined(HAVE_DECL_O_NONBLOCK) && HAVE_DECL_O_NONBLOCK == 0
+#if defined(HAVE_DECL_O_NONBLOCK) && HAVE_DECL_O_NONBLOCK == 0 && !defined(O_NONBLOCK)
 # define O_NONBLOCK      00004	/* Non Blocking Open */
 #endif
 

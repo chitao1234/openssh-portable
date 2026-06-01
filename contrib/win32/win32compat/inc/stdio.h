@@ -8,20 +8,30 @@
 
 /* stdio.h overrides */
 FILE* w32_fopen_utf8(const char *, const char *);
-#define fopen w32_fopen_utf8
+#ifndef WIN32COMPAT_IMPL
+# define fopen w32_fopen_utf8
+#endif
 
 char* w32_fgets(char *str, int n, FILE *stream);
-#define fgets w32_fgets
+#ifndef WIN32COMPAT_IMPL
+# define fgets w32_fgets
+#endif
 
 int w32_setvbuf(FILE *stream,char *buffer, int mode, size_t size);
-#define setvbuf w32_setvbuf
+#ifndef WIN32COMPAT_IMPL
+# define setvbuf w32_setvbuf
+#endif
 
 /* stdio.h additional definitions */
 #define popen _popen
 #define pclose _pclose
 
 FILE* w32_fdopen(int fd, const char *mode);
-#define fdopen(a,b)	w32_fdopen((a), (b))
+#ifndef WIN32COMPAT_IMPL
+# define fdopen(a,b)	w32_fdopen((a), (b))
+#endif
 
 int w32_rename(const char *old_name, const char *new_name);
-#define rename w32_rename
+#ifndef WIN32COMPAT_IMPL
+# define rename w32_rename
+#endif

@@ -26,6 +26,7 @@
 */
 #include "includes.h"
 
+#include <stdlib.h>
 #include <unistd.h>
 #include "xmalloc.h"
 #include "packet.h"

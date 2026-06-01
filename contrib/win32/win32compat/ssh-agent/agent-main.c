@@ -33,6 +33,7 @@
 #include "agent.h"
 #include "../misc_internal.h"
 #include "../Debug.h"
+#include <stdlib.h>
 #include <wchar.h>
 
 #pragma warning(push, 3)

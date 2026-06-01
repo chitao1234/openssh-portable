@@ -106,11 +106,13 @@ fi
 LIBWIN32COMPAT=
 WIN32COMPAT_CPPFLAGS=
 WIN32COMPAT_MAKE_CPPFLAGS=
+WIN32COMPAT_IMPL_CPPFLAGS=
 WIN32COMPAT_LIB=
 GROUPACCESS_O=groupaccess.o
 AC_SUBST([LIBWIN32COMPAT])
 AC_SUBST([WIN32COMPAT_CPPFLAGS])
 AC_SUBST([WIN32COMPAT_MAKE_CPPFLAGS])
+AC_SUBST([WIN32COMPAT_IMPL_CPPFLAGS])
 AC_SUBST([WIN32COMPAT_LIB])
 AC_SUBST([GROUPACCESS_O])
 
@@ -118,22 +120,36 @@ case "$host" in
 *-*-mingw*)
 	LIBWIN32COMPAT="libwin32compat.a"
 	WIN32COMPAT_LIB="contrib/win32/win32compat/${LIBWIN32COMPAT}"
-	WIN32COMPAT_CPPFLAGS="-DWIN32 -DWINDOWS -D_WINDOWS -D_CRT_DECLARE_NONSTDC_NAMES=0 -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS -D_WINSOCK_DEPRECATED_NO_WARNINGS -D_WIN32_WINNT=0x0501 -DGSSAPI=1 -DGSSAPI_SSPI=1 -DHAVE_GSSAPI_H=1"
+	WIN32COMPAT_CPPFLAGS="-DWIN32_LEAN_AND_MEAN=1 -DWIN32 -DWINDOWS -D_WINDOWS -D_CRT_DECLARE_NONSTDC_NAMES=0 -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS -D_WINSOCK_DEPRECATED_NO_WARNINGS -D_WIN32_WINNT=0x0501 -DGSSAPI=1 -DGSSAPI_SSPI=1 -DHAVE_GSSAPI_H=1"
 	WIN32COMPAT_MAKE_CPPFLAGS="-I\$(top_srcdir)/contrib/win32/win32compat/inc -I\$(top_srcdir)/contrib/win32/win32compat"
+	WIN32COMPAT_IMPL_CPPFLAGS="-DWIN32COMPAT_IMPL ${WIN32COMPAT_MAKE_CPPFLAGS}"
 	CPPFLAGS="-D_TIME_BITS=64 -I${srcdir}/contrib/win32/win32compat/inc $CPPFLAGS"
 	LIBS="$LIBS -lws2_32 -lnetapi32 -lsecur32 -luserenv -lshlwapi -ladvapi32 -lshell32 -lole32 -lcrypt32 -lrpcrt4"
 	GROUPACCESS_O=win32_groupaccess.o
 
-	# Seed MinGW results for wrapper-backed headers and cross-size probes.
+	# Match the Visual Studio Win32 config instead of probing the build host
+	# or treating public wrapper redirects as native platform features.
+	AC_DEFINE([WIN32_LEAN_AND_MEAN], [1], [Define to exclude rarely-used Windows headers])
+	AC_DEFINE([SUPPORT_CRLF], [1], [Define to support CRLF line endings])
+	AC_DEFINE([BROKEN_READV_COMPARISON], [1], [Can't do comparisons on readv])
+	AC_DEFINE([GETPGRP_VOID], [1], [getpgrp takes zero args])
+	AC_DEFINE([BROKEN_SYS_TERMIO_H], [1], [Define if sys/termio.h is broken])
+	AC_DEFINE([_STRUCT_WINSIZE], [1], [Define if struct winsize is already declared])
+	ac_cv_header_fcntl_h=no
 	ac_cv_header_netdb_h=yes
 	ac_cv_header_poll_h=yes
+	ac_cv_header_sys_cdefs_h=no
 	ac_cv_header_sys_select_h=yes
+	ac_cv_header_sys_sysmacros_h=no
+	ac_cv_header_vis_h=yes
 	ac_cv_func_fnmatch=yes
 	ac_cv_func_freeaddrinfo=yes
 	ac_cv_func_gai_strerror=yes
 	ac_cv_func_getaddrinfo=yes
+	ac_cv_func_getpgrp=no
 	ac_cv_func_getgrouplist=yes
 	ac_cv_func_getnameinfo=yes
+	ac_cv_func_inet_aton=yes
 	ac_cv_func_inet_ntoa=yes
 	ac_cv_func_inet_ntop=yes
 	ac_cv_func_group_from_gid=yes
@@ -143,6 +159,7 @@ case "$host" in
 	ac_cv_func_realpath=yes
 	ac_cv_func_setenv=yes
 	ac_cv_func_statvfs=yes
+	ac_cv_func_strerror=no
 	ac_cv_func_strsignal=yes
 	ac_cv_func_strmode=yes
 	ac_cv_func_tcgetpgrp=yes
@@ -1773,12 +1790,19 @@ AC_RUN_IFELSE(
 )
 
 AC_MSG_CHECKING([for /proc/pid/fd directory])
-if test -d "/proc/$$/fd" ; then
-	AC_DEFINE([HAVE_PROC_PID], [1], [Define if you have /proc/$pid/fd])
-	AC_MSG_RESULT([yes])
-else
+case "$host" in
+*-*-mingw*)
 	AC_MSG_RESULT([no])
-fi
+	;;
+*)
+	if test -d "/proc/$$/fd" ; then
+		AC_DEFINE([HAVE_PROC_PID], [1], [Define if you have /proc/$pid/fd])
+		AC_MSG_RESULT([yes])
+	else
+		AC_MSG_RESULT([no])
+	fi
+	;;
+esac
 
 # Check whether user wants to use ldns
 LDNS_MSG="no"
