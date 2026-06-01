@@ -104,13 +104,26 @@ ifneq ($(WIN32COMPATLIB),)
 WIN32_TTY_OBJS=win32_sshtty.o win32_sshpty.o ttymodes_windows.o
 endif
 
+WIN32_WMAIN_COMMON_OBJ=
+WIN32_WMAIN_SSHD_OBJ=
+WIN32_WMAIN_SSHD_SESSION_OBJ=
+WIN32_WMAIN_SSHD_AUTH_OBJ=
+ifneq ($(WIN32COMPATLIB),)
+WIN32_WMAIN_COMMON_OBJ=wmain_common.o
+WIN32_WMAIN_SSHD_OBJ=wmain_sshd.o
+WIN32_WMAIN_SSHD_SESSION_OBJ=wmain_sshd-session.o
+WIN32_WMAIN_SSHD_AUTH_OBJ=wmain_sshd-auth.o
+endif
+
 UIDSWAP_OBJS=uidswap.o
 ifneq ($(WIN32COMPATLIB),)
 UIDSWAP_OBJS=
 endif
 
+WMAIN_LDFLAGS=$(LDFLAGS)
 SSHAGENT_LDFLAGS=$(LDFLAGS)
 ifneq ($(WIN32COMPATLIB),)
+WMAIN_LDFLAGS+=-municode
 SSHAGENT_LDFLAGS+=-municode
 endif
 
@@ -164,13 +177,14 @@ LIBSSH_OBJS=${LIBOPENSSH_OBJS} \
 SKOBJS=	ssh-sk-client.o
 
 SSHOBJS= ssh.o readconf.o clientloop.o \
-	sshconnect.o sshconnect2.o mux.o $(SKOBJS)
+	sshconnect.o sshconnect2.o mux.o $(SKOBJS) \
+	$(WIN32_WMAIN_COMMON_OBJ)
 
 SSHDOBJS=sshd.o \
 	platform-listen.o \
 	servconf.o srclimit.o $(GROUPACCESS_O) auth2-methods.o \
 	dns.o fatal.o compat.o utf8.o authfd.o canohost.o \
-	$(SKOBJS)
+	$(SKOBJS) $(WIN32_WMAIN_SSHD_OBJ)
 
 SSHD_SESSION_OBJS=sshd-session.o auth-rhosts.o auth-passwd.o \
 	audit.o audit-bsm.o audit-linux.o platform.o \
@@ -183,7 +197,8 @@ SSHD_SESSION_OBJS=sshd-session.o auth-rhosts.o auth-passwd.o \
 	auth2-gss.o gss-serv.o gss-serv-krb5.o \
 	loginrec.o auth-pam.o auth-shadow.o auth-sia.o \
 	sftp-server.o sftp-common.o \
-	$(UIDSWAP_OBJS) platform-listen.o $(WIN32_SESSION_OBJS) $(SKOBJS)
+	$(UIDSWAP_OBJS) platform-listen.o $(WIN32_SESSION_OBJS) $(SKOBJS) \
+	$(WIN32_WMAIN_SSHD_SESSION_OBJ)
 
 SSHD_AUTH_OBJS=sshd-auth.o \
 	auth2-methods.o \
@@ -198,32 +213,40 @@ SSHD_AUTH_OBJS=sshd-auth.o \
 	sandbox-null.o sandbox-rlimit.o sandbox-darwin.o \
 	sandbox-seccomp-filter.o sandbox-capsicum.o  sandbox-solaris.o \
 	sftp-server.o sftp-common.o \
-	$(UIDSWAP_OBJS) $(WIN32_SESSION_OBJS) $(SKOBJS)
+	$(UIDSWAP_OBJS) $(WIN32_SESSION_OBJS) $(SKOBJS) \
+	$(WIN32_WMAIN_SSHD_AUTH_OBJ)
 
 SFTP_CLIENT_OBJS=sftp-common.o sftp-client.o sftp-glob.o
 
-SCP_OBJS=	scp.o progressmeter.o $(SFTP_CLIENT_OBJS)
+SCP_OBJS=	scp.o progressmeter.o $(SFTP_CLIENT_OBJS) \
+	$(WIN32_WMAIN_COMMON_OBJ)
 
-SSHADD_OBJS=	ssh-add.o $(SKOBJS)
+SSHADD_OBJS=	ssh-add.o $(SKOBJS) \
+	$(WIN32_WMAIN_COMMON_OBJ)
 
 SSHAGENT_OBJS=	ssh-agent.o ssh-pkcs11-client.o $(SKOBJS)
 ifneq ($(WIN32COMPATLIB),)
 SSHAGENT_OBJS=	$(WIN32_AGENT_OBJS) ssh-pkcs11-client.o $(SKOBJS)
 endif
 
-SSHKEYGEN_OBJS=	ssh-keygen.o sshsig.o $(SKOBJS)
+SSHKEYGEN_OBJS=	ssh-keygen.o sshsig.o $(SKOBJS) \
+	$(WIN32_WMAIN_COMMON_OBJ)
 
 SSHKEYSIGN_OBJS=ssh-keysign.o readconf.o $(UIDSWAP_OBJS) $(SKOBJS)
 
-P11HELPER_OBJS=	ssh-pkcs11-helper.o ssh-pkcs11.o $(SKOBJS)
+P11HELPER_OBJS=	ssh-pkcs11-helper.o ssh-pkcs11.o $(SKOBJS) \
+	$(WIN32_WMAIN_COMMON_OBJ)
 
-SKHELPER_OBJS=	ssh-sk-helper.o ssh-sk.o sk-usbhid.o
+SKHELPER_OBJS=	ssh-sk-helper.o ssh-sk.o sk-usbhid.o \
+	$(WIN32_WMAIN_COMMON_OBJ)
 
-SSHKEYSCAN_OBJS=ssh-keyscan.o $(SKOBJS)
+SSHKEYSCAN_OBJS=ssh-keyscan.o $(SKOBJS) $(WIN32_WMAIN_COMMON_OBJ)
 
-SFTPSERVER_OBJS=sftp-common.o sftp-server.o sftp-server-main.o
+SFTPSERVER_OBJS=sftp-common.o sftp-server.o sftp-server-main.o \
+	$(WIN32_WMAIN_COMMON_OBJ)
 
-SFTP_OBJS=	sftp.o sftp-usergroup.o progressmeter.o $(SFTP_CLIENT_OBJS)
+SFTP_OBJS=	sftp.o sftp-usergroup.o progressmeter.o $(SFTP_CLIENT_OBJS) \
+	$(WIN32_WMAIN_COMMON_OBJ)
 
 MANPAGES	= moduli.5.out scp.1.out ssh-add.1.out ssh-agent.1.out ssh-keygen.1.out ssh-keyscan.1.out ssh.1.out sshd.8.out sftp-server.8.out sftp.1.out ssh-keysign.8.out ssh-pkcs11-helper.8.out ssh-sk-helper.8.out sshd_config.5.out ssh_config.5.out
 MANPAGES_IN	= moduli.5 scp.1 ssh-add.1 ssh-agent.1 ssh-keygen.1 ssh-keyscan.1 ssh.1 sshd.8 sftp-server.8 sftp.1 ssh-keysign.8 ssh-pkcs11-helper.8 ssh-sk-helper.8 sshd_config.5 ssh_config.5
@@ -291,6 +314,18 @@ win32_ssh_agent_connection.o: $(srcdir)/contrib/win32/win32compat/ssh-agent/conn
 win32_ssh_agent_keyagent_request.o: $(srcdir)/contrib/win32/win32compat/ssh-agent/keyagent-request.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
+wmain_common.o: $(srcdir)/contrib/win32/win32compat/wmain_common.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+wmain_sshd.o: $(srcdir)/contrib/win32/win32compat/wmain_sshd.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+wmain_sshd-session.o: $(srcdir)/contrib/win32/win32compat/wmain_sshd-session.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+wmain_sshd-auth.o: $(srcdir)/contrib/win32/win32compat/wmain_sshd-auth.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
 shell-host.o: $(srcdir)/contrib/win32/win32compat/shell-host.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
@@ -318,22 +353,22 @@ libssh.a: $(LIBSSH_OBJS)
 	$(RANLIB) $@
 
 ssh$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SSHOBJS)
-	$(LD) -o $@ $(SSHOBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(GSSLIBS) $(CHANNELLIBS)
+	$(LD) -o $@ $(SSHOBJS) $(WMAIN_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(GSSLIBS) $(CHANNELLIBS)
 
 sshd$(EXEEXT): libssh.a	$(LIBCOMPAT) $(WIN32COMPATLIB) $(SSHDOBJS)
-	$(LD) -o $@ $(SSHDOBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(SSHDLIBS) $(LIBS) $(CHANNELLIBS)
+	$(LD) -o $@ $(SSHDOBJS) $(WMAIN_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(SSHDLIBS) $(LIBS) $(CHANNELLIBS)
 
 sshd-session$(EXEEXT): libssh.a	$(LIBCOMPAT) $(WIN32COMPATLIB) $(SSHD_SESSION_OBJS)
-	$(LD) -o $@ $(SSHD_SESSION_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(SSHDLIBS) $(LIBS) $(GSSLIBS) $(K5LIBS) $(CHANNELLIBS) $(LIBWTMPDB)
+	$(LD) -o $@ $(SSHD_SESSION_OBJS) $(WMAIN_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(SSHDLIBS) $(LIBS) $(GSSLIBS) $(K5LIBS) $(CHANNELLIBS) $(LIBWTMPDB)
 
 sshd-auth$(EXEEXT): libssh.a $(LIBCOMPAT) $(WIN32COMPATLIB) $(SSHD_AUTH_OBJS)
-	$(LD) -o $@ $(SSHD_AUTH_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(SSHDLIBS) $(LIBS) $(GSSLIBS) $(K5LIBS) $(CHANNELLIBS) $(LIBWTMPDB)
+	$(LD) -o $@ $(SSHD_AUTH_OBJS) $(WMAIN_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(SSHDLIBS) $(LIBS) $(GSSLIBS) $(K5LIBS) $(CHANNELLIBS) $(LIBWTMPDB)
 
 scp$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SCP_OBJS)
-	$(LD) -o $@ $(SCP_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS)
+	$(LD) -o $@ $(SCP_OBJS) $(WMAIN_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS)
 
 ssh-add$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SSHADD_OBJS)
-	$(LD) -o $@ $(SSHADD_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(CHANNELLIBS)
+	$(LD) -o $@ $(SSHADD_OBJS) $(WMAIN_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(CHANNELLIBS)
 
 ssh-agent$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SSHAGENT_OBJS)
 	$(LD) -o $@ $(SSHAGENT_OBJS) $(SSHAGENT_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(CHANNELLIBS)
@@ -342,25 +377,25 @@ ssh-shellhost$(EXEEXT): $(WIN32COMPATLIB) shell-host.o
 	$(LD) -o $@ shell-host.o $(SSHAGENT_LDFLAGS) $(WIN32COMPATLIB) $(LIBS)
 
 ssh-keygen$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SSHKEYGEN_OBJS)
-	$(LD) -o $@ $(SSHKEYGEN_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(CHANNELLIBS)
+	$(LD) -o $@ $(SSHKEYGEN_OBJS) $(WMAIN_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(CHANNELLIBS)
 
 ssh-keysign$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SSHKEYSIGN_OBJS)
 	$(LD) -o $@ $(SSHKEYSIGN_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(CHANNELLIBS)
 
 ssh-pkcs11-helper$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(P11HELPER_OBJS)
-	$(LD) -o $@ $(P11HELPER_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(CHANNELLIBS)
+	$(LD) -o $@ $(P11HELPER_OBJS) $(WMAIN_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(CHANNELLIBS)
 
 ssh-sk-helper$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SKHELPER_OBJS)
-	$(LD) -o $@ $(SKHELPER_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(LIBFIDO2) $(CHANNELLIBS)
+	$(LD) -o $@ $(SKHELPER_OBJS) $(WMAIN_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(LIBFIDO2) $(CHANNELLIBS)
 
 ssh-keyscan$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SSHKEYSCAN_OBJS)
-	$(LD) -o $@ $(SSHKEYSCAN_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) -lssh $(LIBS) $(CHANNELLIBS)
+	$(LD) -o $@ $(SSHKEYSCAN_OBJS) $(WMAIN_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) -lssh $(LIBS) $(CHANNELLIBS)
 
 sftp-server$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SFTPSERVER_OBJS)
-	$(LD) -o $@ $(SFTPSERVER_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) -lssh $(LIBS)
+	$(LD) -o $@ $(SFTPSERVER_OBJS) $(WMAIN_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) -lssh $(LIBS)
 
 sftp$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SFTP_OBJS)
-	$(LD) -o $@ $(SFTP_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(LIBEDIT)
+	$(LD) -o $@ $(SFTP_OBJS) $(WMAIN_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(LIBEDIT)
 
 # test driver for the loginrec code - not built by default
 logintest: logintest.o $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a loginrec.o
