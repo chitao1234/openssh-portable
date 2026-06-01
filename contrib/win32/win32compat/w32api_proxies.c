@@ -891,7 +891,7 @@ ULONG pRtlNtStatusToDosError(NTSTATUS status)
 		if ((s_pRtlNtStatusToDosError = (RtlNtStatusToDosErrorType)get_proc_address(hm, "RtlNtStatusToDosError")) == NULL)
 			return STATUS_ASSERTION_FAILURE;
 	}
-	return pRtlNtStatusToDosError(status);
+	return s_pRtlNtStatusToDosError(status);
 }
 
 NTSTATUS pLsaClose(LSA_HANDLE lsa_h)
