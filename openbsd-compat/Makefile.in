@@ -105,6 +105,8 @@ PORTS=	port-aix.o \
 
 all: libopenbsd-compat.a
 
+.PHONY: libopenbsd-compat.a
+
 $(COMPAT): ../config.h
 $(OPENBSD): ../config.h
 $(PORTS): ../config.h
