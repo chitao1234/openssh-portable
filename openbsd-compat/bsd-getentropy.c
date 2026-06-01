@@ -31,12 +31,47 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#ifdef WINDOWS
+#include <windows.h>
+#include <wincrypt.h>
+#endif
 #ifdef WITH_OPENSSL
 #include <openssl/rand.h>
 #include <openssl/err.h>
 #endif
 
 #include "log.h"
+
+#ifdef WINDOWS
+static void
+w32_getentropy(void *s, size_t len)
+{
+	HCRYPTPROV provider = 0;
+	u_char *p = s;
+	DWORD chunk, error;
+
+	if (!CryptAcquireContext(&provider, NULL, NULL, PROV_RSA_FULL,
+	    CRYPT_VERIFYCONTEXT)) {
+		error = GetLastError();
+		fatal("CryptAcquireContext failed: error %lu",
+		    (unsigned long)error);
+	}
+
+	while (len > 0) {
+		chunk = len > 1048576 ? 1048576 : (DWORD)len;
+		if (!CryptGenRandom(provider, chunk, p)) {
+			error = GetLastError();
+			CryptReleaseContext(provider, 0);
+			fatal("CryptGenRandom failed: error %lu",
+			    (unsigned long)error);
+		}
+		p += chunk;
+		len -= chunk;
+	}
+
+	CryptReleaseContext(provider, 0);
+}
+#endif /* WINDOWS */
 
 int
 _ssh_compat_getentropy(void *s, size_t len)
@@ -46,9 +81,13 @@ _ssh_compat_getentropy(void *s, size_t len)
 		fatal("Couldn't obtain random bytes (error 0x%lx)",
 		    (unsigned long)ERR_get_error());
 #else
-	int fd, save_errno;
+#if defined(HAVE_GETENTROPY) || defined(HAVE_GETRANDOM)
 	ssize_t r;
+#endif
+#ifndef WINDOWS
+	int fd, save_errno;
 	size_t o = 0;
+#endif
 
 #ifdef WITH_OPENSSL
 	if (RAND_bytes(s, len) == 1)
@@ -63,6 +102,10 @@ _ssh_compat_getentropy(void *s, size_t len)
 		return 0;
 #endif /* HAVE_GETRANDOM */
 
+#ifdef WINDOWS
+	w32_getentropy(s, len);
+	return 0;
+#else
 	if ((fd = open(SSH_RANDOM_DEV, O_RDONLY)) == -1) {
 		save_errno = errno;
 		/* Try egd/prngd before giving up. */
@@ -82,6 +125,7 @@ _ssh_compat_getentropy(void *s, size_t len)
 		o += r;
 	}
 	close(fd);
+#endif /* WINDOWS */
 #endif /* WITH_OPENSSL */
 	return 0;
 }
