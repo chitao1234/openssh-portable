@@ -20,6 +20,7 @@
 
 int w32_ftruncate(int, off_t);
 #define ftruncate(a, b) w32_ftruncate((a), (b))
+int truncate(const char *, off_t);
 
 #define pipe w32_pipe
 int w32_pipe(int *pfds);
