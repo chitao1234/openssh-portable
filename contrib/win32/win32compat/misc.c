@@ -745,9 +745,9 @@ unix_time_to_file_time(ULONG t, LPFILETIME pft)
 	pft->dwHighDateTime = (DWORD)(ull >> 32);
 }
 
-/* Convert a Windows file time into a UNIX time_t */
+/* Convert a Windows file time into a 64-bit UNIX timestamp. */
 void
-file_time_to_unix_time(const LPFILETIME pft, time_t * winTime)
+file_time_to_unix_time(const LPFILETIME pft, __time64_t * winTime)
 {
 	*winTime = ((long long)pft->dwHighDateTime << 32) + pft->dwLowDateTime;
 	*winTime -= EPOCH_DELTA;
