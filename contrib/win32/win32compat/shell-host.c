@@ -40,9 +40,15 @@
 #include <shlobj.h>
 #include <sddl.h>
 #include <process.h>
-#include "misc_internal.h"
+#include "win32_path_max.h"
 #include "utf.h"
-#include "w32api_proxies.h"
+
+#ifndef MAX_CMD_LEN
+#define MAX_CMD_LEN 8191
+#endif
+#ifndef IS_INVALID_HANDLE
+#define IS_INVALID_HANDLE(h) ((h) == NULL || (h) == INVALID_HANDLE_VALUE)
+#endif
 
 #define MAX_CONSOLE_COLUMNS 9999
 #define MAX_CONSOLE_ROWS 9999
@@ -304,7 +310,7 @@ CRITICAL_SECTION criticalSection;
 
 CONSOLE_SCREEN_BUFFER_INFOEX  consoleInfo;
 CONSOLE_SCREEN_BUFFER_INFOEX  nextConsoleInfo;
-STARTUPINFO inputSi;
+STARTUPINFOW inputSi;
 
 #define GOTO_CLEANUP_ON_FALSE(exp) do {	\
 	ret = (exp);			\
@@ -320,6 +326,46 @@ STARTUPINFO inputSi;
 void     
 debug3(const char *s, ...) {
 	return;
+}
+
+static BOOL
+pGetConsoleScreenBufferInfoEx(HANDLE handle,
+    PCONSOLE_SCREEN_BUFFER_INFOEX console_info)
+{
+	typedef BOOL (WINAPI *GetConsoleScreenBufferInfoExType)(HANDLE,
+	    PCONSOLE_SCREEN_BUFFER_INFOEX);
+	static GetConsoleScreenBufferInfoExType s_pGetConsoleScreenBufferInfoEx = NULL;
+	static int s_init = 0;
+	CONSOLE_SCREEN_BUFFER_INFO basic_info;
+	ULONG cb_size;
+	HMODULE hm;
+
+	if (!s_init) {
+		s_init = 1;
+		if ((hm = LoadLibraryW(L"kernel32.dll")) != NULL)
+			s_pGetConsoleScreenBufferInfoEx =
+			    (GetConsoleScreenBufferInfoExType)GetProcAddress(hm,
+			    "GetConsoleScreenBufferInfoEx");
+	}
+	if (s_pGetConsoleScreenBufferInfoEx != NULL)
+		return s_pGetConsoleScreenBufferInfoEx(handle, console_info);
+
+	if (console_info == NULL) {
+		SetLastError(ERROR_INVALID_PARAMETER);
+		return FALSE;
+	}
+	if (!GetConsoleScreenBufferInfo(handle, &basic_info))
+		return FALSE;
+
+	cb_size = console_info->cbSize;
+	memset(console_info, 0, sizeof(*console_info));
+	console_info->cbSize = cb_size != 0 ? cb_size : sizeof(*console_info);
+	console_info->dwSize = basic_info.dwSize;
+	console_info->dwCursorPosition = basic_info.dwCursorPosition;
+	console_info->wAttributes = basic_info.wAttributes;
+	console_info->srWindow = basic_info.srWindow;
+	console_info->dwMaximumWindowSize = basic_info.dwMaximumWindowSize;
+	return TRUE;
 }
 
 int
@@ -1174,7 +1220,7 @@ ProcessPipes(LPVOID p)
 	/* process data from pipe_in and route appropriately */
 	while (1) {
 		ZeroMemory(buf, sizeof(buf));
-		int rd = 0;
+		DWORD rd = 0;
 
 		GOTO_CLEANUP_ON_FALSE(ReadFile(pipe_in, buf, sizeof(buf) - 1, &rd, NULL)); /* read bufsize-1 */
 		bStartup = FALSE;
@@ -1250,7 +1296,7 @@ ProcessMessages(void* p)
 int 
 start_with_pty(wchar_t *command)
 {
-	STARTUPINFO si;
+	STARTUPINFOW si;
 	PROCESS_INFORMATION pi;
 	wchar_t *cmd = (wchar_t *)malloc(sizeof(wchar_t) * MAX_CMD_LEN);
 	SECURITY_ATTRIBUTES sa;
@@ -1301,8 +1347,8 @@ start_with_pty(wchar_t *command)
 	 */	
 	SendClearScreen(pipe_out);
 
-	ZeroMemory(&inputSi, sizeof(STARTUPINFO));
-	GetStartupInfo(&inputSi);
+	ZeroMemory(&inputSi, sizeof(STARTUPINFOW));
+	GetStartupInfoW(&inputSi);
 	memset(&sa, 0, sizeof(SECURITY_ATTRIBUTES));
 	sa.bInheritHandle = TRUE;
 	/* WM_APPEXIT */
@@ -1317,10 +1363,10 @@ start_with_pty(wchar_t *command)
 #pragma warning(suppress: 6387)
 	hEventHook = __SetWinEventHook(EVENT_CONSOLE_CARET, EVENT_CONSOLE_END_APPLICATION, NULL,
 					ConsoleEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
-	memset(&si, 0, sizeof(STARTUPINFO));
+	memset(&si, 0, sizeof(STARTUPINFOW));
 	memset(&pi, 0, sizeof(PROCESS_INFORMATION));
 	/* Copy our parent buffer sizes */
-	si.cb = sizeof(STARTUPINFO);
+	si.cb = sizeof(STARTUPINFOW);
 	si.dwFlags = 0;
 	/* disable inheritance on pipe_in*/
 	GOTO_CLEANUP_ON_FALSE(SetHandleInformation(pipe_in, HANDLE_FLAG_INHERIT, 0));
@@ -1329,9 +1375,9 @@ start_with_pty(wchar_t *command)
 	* Launch via cmd.exe /c, otherwise known issues exist with color rendering in powershell
 	*/
 	_snwprintf_s(cmd, MAX_CMD_LEN, MAX_CMD_LEN, L"\"%ls\\cmd.exe\" /c \"%ls\"", system32_path, command);
-	
+
 	SetConsoleCtrlHandler(NULL, FALSE);
-	GOTO_CLEANUP_ON_FALSE(CreateProcess(NULL, cmd, NULL, NULL, TRUE, CREATE_NEW_CONSOLE,
+	GOTO_CLEANUP_ON_FALSE(CreateProcessW(NULL, cmd, NULL, NULL, TRUE, CREATE_NEW_CONSOLE,
 				NULL, NULL, &si, &pi));
 	childProcessId = pi.dwProcessId;
 

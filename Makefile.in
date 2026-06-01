@@ -94,6 +94,11 @@ WIN32_AGENT_OBJS=win32_ssh_agent_main.o win32_ssh_agent.o \
 	win32_ssh_agent_connection.o win32_ssh_agent_keyagent_request.o
 endif
 
+WIN32_SHELLHOST_TARGET=
+ifneq ($(WIN32COMPATLIB),)
+WIN32_SHELLHOST_TARGET=ssh-shellhost$(EXEEXT)
+endif
+
 WIN32_TTY_OBJS=
 ifneq ($(WIN32COMPATLIB),)
 WIN32_TTY_OBJS=win32_sshtty.o win32_sshpty.o ttymodes_windows.o
@@ -111,7 +116,7 @@ endif
 
 .SUFFIXES: .lo
 
-TARGETS=ssh$(EXEEXT) sshd$(EXEEXT) sshd-session$(EXEEXT) sshd-auth$(EXEEXT) ssh-add$(EXEEXT) ssh-keygen$(EXEEXT) ssh-keyscan${EXEEXT} ssh-keysign${EXEEXT} ssh-pkcs11-helper$(EXEEXT) ssh-agent$(EXEEXT) scp$(EXEEXT) sftp-server$(EXEEXT) sftp$(EXEEXT) ssh-sk-helper$(EXEEXT) $(SK_STANDALONE)
+TARGETS=ssh$(EXEEXT) sshd$(EXEEXT) sshd-session$(EXEEXT) sshd-auth$(EXEEXT) ssh-add$(EXEEXT) ssh-keygen$(EXEEXT) ssh-keyscan${EXEEXT} ssh-keysign${EXEEXT} ssh-pkcs11-helper$(EXEEXT) ssh-agent$(EXEEXT) scp$(EXEEXT) sftp-server$(EXEEXT) sftp$(EXEEXT) ssh-sk-helper$(EXEEXT) $(WIN32_SHELLHOST_TARGET) $(SK_STANDALONE)
 
 XMSS_OBJS=\
 	ssh-xmss.o \
@@ -286,6 +291,9 @@ win32_ssh_agent_connection.o: $(srcdir)/contrib/win32/win32compat/ssh-agent/conn
 win32_ssh_agent_keyagent_request.o: $(srcdir)/contrib/win32/win32compat/ssh-agent/keyagent-request.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
+shell-host.o: $(srcdir)/contrib/win32/win32compat/shell-host.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
 LIBCOMPAT=openbsd-compat/libopenbsd-compat.a
 $(LIBCOMPAT): always
 	(cd openbsd-compat && $(MAKE))
@@ -329,6 +337,9 @@ ssh-add$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SSHADD_OBJS)
 
 ssh-agent$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SSHAGENT_OBJS)
 	$(LD) -o $@ $(SSHAGENT_OBJS) $(SSHAGENT_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(CHANNELLIBS)
+
+ssh-shellhost$(EXEEXT): $(WIN32COMPATLIB) shell-host.o
+	$(LD) -o $@ shell-host.o $(SSHAGENT_LDFLAGS) $(WIN32COMPATLIB) $(LIBS)
 
 ssh-keygen$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SSHKEYGEN_OBJS)
 	$(LD) -o $@ $(SSHKEYGEN_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(CHANNELLIBS)
@@ -532,6 +543,9 @@ install-files:
 	$(INSTALL) -m 0755 $(STRIP_OPT) ssh-keyscan$(EXEEXT) $(DESTDIR)$(bindir)/ssh-keyscan$(EXEEXT)
 	$(INSTALL) -m 0755 $(STRIP_OPT) sshd$(EXEEXT) $(DESTDIR)$(sbindir)/sshd$(EXEEXT)
 	$(INSTALL) -m 0755 $(STRIP_OPT) sshd-session$(EXEEXT) $(DESTDIR)$(SSHD_SESSION)$(EXEEXT)
+	@if test -n "$(WIN32_SHELLHOST_TARGET)" ; then \
+		$(INSTALL) -m 0755 $(STRIP_OPT) ssh-shellhost$(EXEEXT) $(DESTDIR)$(libexecdir)/ssh-shellhost$(EXEEXT) ; \
+	fi
 	$(INSTALL) -m 0755 $(STRIP_OPT) sshd-auth$(EXEEXT) $(DESTDIR)$(SSHD_AUTH)$(EXEEXT)
 	$(INSTALL) -m 4711 $(STRIP_OPT) ssh-keysign$(EXEEXT) $(DESTDIR)$(SSH_KEYSIGN)$(EXEEXT)
 	$(INSTALL) -m 0755 $(STRIP_OPT) ssh-pkcs11-helper$(EXEEXT) $(DESTDIR)$(SSH_PKCS11_HELPER)$(EXEEXT)
@@ -610,6 +624,7 @@ uninstall:
 	-rm -f $(DESTDIR)$(bindir)/ssh-keyscan$(EXEEXT)
 	-rm -f $(DESTDIR)$(bindir)/sftp$(EXEEXT)
 	-rm -f $(DESTDIR)$(sbindir)/sshd$(EXEEXT)
+	-rm -f $(DESTDIR)$(libexecdir)/ssh-shellhost$(EXEEXT)
 	-rm -r $(DESTDIR)$(SFTP_SERVER)$(EXEEXT)
 	-rm -f $(DESTDIR)$(SSH_KEYSIGN)$(EXEEXT)
 	-rm -f $(DESTDIR)$(SSH_PKCS11_HELPER)$(EXEEXT)
