@@ -239,6 +239,40 @@ void test_realpath()
 }
 
 void
+test_securecrt_putenv()
+{
+	char *value = NULL;
+	wchar_t *wvalue = NULL;
+	size_t len = 0;
+
+	TEST_START("securecrt putenv sync");
+
+	ASSERT_INT_EQ(_putenv_s("SSH_TEST_WIN32_ENV", "alpha"), 0);
+	ASSERT_INT_EQ(_dupenv_s(&value, &len, "SSH_TEST_WIN32_ENV"), 0);
+	ASSERT_PTR_NE(value, NULL);
+	ASSERT_STRING_EQ(value, "alpha");
+	free(value);
+	value = NULL;
+
+	ASSERT_INT_EQ(_wputenv_s(L"SSH_TEST_WIN32_WENV", L"beta"), 0);
+	ASSERT_INT_EQ(_wdupenv_s(&wvalue, &len, L"SSH_TEST_WIN32_WENV"), 0);
+	ASSERT_PTR_NE(wvalue, NULL);
+	ASSERT_INT_EQ(wcscmp(wvalue, L"beta"), 0);
+	free(wvalue);
+	wvalue = NULL;
+
+	ASSERT_INT_EQ(_putenv_s("SSH_TEST_WIN32_ENV", ""), 0);
+	ASSERT_INT_EQ(_dupenv_s(&value, &len, "SSH_TEST_WIN32_ENV"), 0);
+	ASSERT_PTR_EQ(value, NULL);
+
+	ASSERT_INT_EQ(_wputenv_s(L"SSH_TEST_WIN32_WENV", L""), 0);
+	ASSERT_INT_EQ(_wdupenv_s(&wvalue, &len, L"SSH_TEST_WIN32_WENV"), 0);
+	ASSERT_PTR_EQ(wvalue, NULL);
+
+	TEST_DONE();
+}
+
+void
 test_chroot()
 {
 	int fd;
@@ -451,6 +485,7 @@ miscellaneous_tests()
 	test_sanitizedpath();
 	test_pw();
 	test_realpath();
+	test_securecrt_putenv();
 	test_statvfs();
 	test_chroot();
 	test_build_exec_command();

@@ -23,6 +23,8 @@
 #include <wchar.h>
 #include <wctype.h>
 
+#include "misc_internal.h"
+
 #ifndef _TRUNCATE
 # define _TRUNCATE ((size_t)-1)
 #endif
@@ -442,6 +444,7 @@ _putenv_s(const char *name, const char *value)
 	char *entry;
 	size_t name_len, value_len;
 	int ret;
+	BOOL win32_ret;
 
 	if (name == NULL || *name == '\0' || strchr(name, '=') != NULL ||
 	    value == NULL)
@@ -456,7 +459,12 @@ _putenv_s(const char *name, const char *value)
 	memcpy(entry + name_len + 1, value, value_len + 1);
 	ret = _putenv(entry);
 	free(entry);
-	return ret == 0 ? 0 : errno;
+	if (ret != 0)
+		return errno;
+	win32_ret = SetEnvironmentVariableA(name, value_len != 0 ? value : NULL);
+	if (!win32_ret)
+		return errno_from_Win32Error(GetLastError());
+	return 0;
 }
 
 errno_t __cdecl
@@ -465,6 +473,7 @@ _wputenv_s(const wchar_t *name, const wchar_t *value)
 	wchar_t *entry;
 	size_t name_len, value_len;
 	int ret;
+	BOOL win32_ret;
 
 	if (name == NULL || *name == L'\0' || wcschr(name, L'=') != NULL ||
 	    value == NULL)
@@ -479,7 +488,12 @@ _wputenv_s(const wchar_t *name, const wchar_t *value)
 	wmemcpy(entry + name_len + 1, value, value_len + 1);
 	ret = _wputenv(entry);
 	free(entry);
-	return ret == 0 ? 0 : errno;
+	if (ret != 0)
+		return errno;
+	win32_ret = SetEnvironmentVariableW(name, value_len != 0 ? value : NULL);
+	if (!win32_ret)
+		return errno_from_Win32Error(GetLastError());
+	return 0;
 }
 
 errno_t __cdecl
