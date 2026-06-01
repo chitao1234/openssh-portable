@@ -339,6 +339,12 @@ wmain_sshd-auth.o: $(srcdir)/contrib/win32/win32compat/wmain_sshd-auth.c
 shell-host.o: $(srcdir)/contrib/win32/win32compat/shell-host.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
+utf.o: $(srcdir)/contrib/win32/win32compat/utf.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+securecrt.o: $(srcdir)/contrib/win32/win32compat/securecrt.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
 LIBCOMPAT=openbsd-compat/libopenbsd-compat.a
 $(LIBCOMPAT): always
 	(cd openbsd-compat && $(MAKE))
@@ -383,8 +389,9 @@ ssh-add$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SSHADD_OBJS)
 ssh-agent$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SSHAGENT_OBJS)
 	$(LD) -o $@ $(SSHAGENT_OBJS) $(SSHAGENT_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(CHANNELLIBS)
 
-ssh-shellhost$(EXEEXT): $(WIN32COMPATLIB) shell-host.o
-	$(LD) -o $@ shell-host.o $(SSHAGENT_LDFLAGS) $(WIN32COMPATLIB) $(LIBS)
+ssh-shellhost$(EXEEXT): $(LIBCOMPAT) shell-host.o utf.o securecrt.o
+	$(LD) -o $@ shell-host.o utf.o securecrt.o $(WMAIN_LDFLAGS) \
+	    -lopenbsd-compat $(LIBS)
 
 ssh-keygen$(EXEEXT): $(LIBCOMPAT) $(WIN32COMPATLIB) libssh.a $(SSHKEYGEN_OBJS)
 	$(LD) -o $@ $(SSHKEYGEN_OBJS) $(WMAIN_LDFLAGS) -lssh -lopenbsd-compat $(WIN32COMPATLIB) $(LIBS) $(CHANNELLIBS)

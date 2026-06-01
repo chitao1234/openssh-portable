@@ -9,6 +9,7 @@
 # define __LIBMSVCRT__
 #endif
 
+#include <winsock2.h>
 #include <windows.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -67,6 +68,29 @@ w32_clear_wchar(wchar_t *dst, size_t size, errno_t err)
 	if (dst != NULL && size > 0)
 		dst[0] = L'\0';
 	return err;
+}
+
+static int
+w32_errno_from_win32_error(int win32_error)
+{
+	switch (win32_error) {
+	case ERROR_PRIVILEGE_NOT_HELD:
+	case ERROR_ACCESS_DENIED:
+		return EACCES;
+	case ERROR_OUTOFMEMORY:
+		return ENOMEM;
+	case ERROR_FILE_EXISTS:
+		return EEXIST;
+	case ERROR_FILE_NOT_FOUND:
+	case ERROR_PATH_NOT_FOUND:
+	case ERROR_INVALID_NAME:
+		return ENOENT;
+	case ERROR_INVALID_FUNCTION:
+	case ERROR_NOT_SUPPORTED:
+		return EOPNOTSUPP;
+	default:
+		return win32_error;
+	}
 }
 
 errno_t __cdecl
@@ -463,7 +487,7 @@ _putenv_s(const char *name, const char *value)
 		return errno;
 	win32_ret = SetEnvironmentVariableA(name, value_len != 0 ? value : NULL);
 	if (!win32_ret)
-		return errno_from_Win32Error(GetLastError());
+		return w32_errno_from_win32_error(GetLastError());
 	return 0;
 }
 
@@ -492,7 +516,7 @@ _wputenv_s(const wchar_t *name, const wchar_t *value)
 		return errno;
 	win32_ret = SetEnvironmentVariableW(name, value_len != 0 ? value : NULL);
 	if (!win32_ret)
-		return errno_from_Win32Error(GetLastError());
+		return w32_errno_from_win32_error(GetLastError());
 	return 0;
 }
 
