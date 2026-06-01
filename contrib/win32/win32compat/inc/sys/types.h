@@ -29,8 +29,6 @@ typedef _ino_t ino_t;
 #ifndef _MODE_T_
 #define _MODE_T_
 typedef unsigned short _mode_t;
-#endif
-#ifndef mode_t
 typedef _mode_t mode_t;
 #endif
 
