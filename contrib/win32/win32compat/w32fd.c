@@ -51,6 +51,7 @@
 #include <assert.h>
 #include "direct.h"
 #include <winioctl.h>
+#include <shlobj.h>
 #include <shlwapi.h>
 #include <sys/utime.h>
 #include "misc_internal.h"
@@ -90,6 +91,31 @@ wchar_t* __wprogdata = L"";
 /* ssh-agent impersonation context */
 char *sshagent_con_username = NULL;
 HANDLE sshagent_client_primary_token = NULL;
+
+static void
+init_program_data_path(void)
+{
+	wchar_t common_appdata[PATH_MAX] = { 0 };
+	size_t len = 0;
+
+	_dupenv_s(&__progdata, &len, "ProgramData");
+	if (__progdata == NULL || __progdata[0] == '\0') {
+		if (__progdata != NULL) {
+			free(__progdata);
+			__progdata = NULL;
+		}
+		if (!SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_COMMON_APPDATA,
+		    NULL, SHGFP_TYPE_CURRENT, common_appdata)))
+			fatal("couldn't resolve ProgramData or common appdata path");
+		if ((__progdata = utf16_to_utf8(common_appdata)) == NULL)
+			fatal("%s out of memory", __func__);
+		if (_putenv_s("ProgramData", __progdata) != 0)
+			debug3("failed to seed ProgramData environment variable");
+	}
+
+	if ((__wprogdata = utf8_to_utf16(__progdata)) == NULL)
+		fatal("%s out of memory", __func__);
+}
 
 /* initializes mapping table*/
 static int
@@ -233,15 +259,7 @@ init_prog_paths()
 	/* strip .exe off __progname */
 	*(__progname + strlen(__progname) - 4) = '\0';
 
-	/* get %programdata% value */
-	size_t len = 0;
-	_dupenv_s(&__progdata, &len, "ProgramData");
-
-	if (!__progdata)
-		fatal("couldn't find ProgramData environment variable");
-
-	if(!(__wprogdata = utf8_to_utf16(__progdata)))
-		fatal("%s out of memory", __func__, __LINE__);
+	init_program_data_path();
 
 	processed = 1;
 }
