@@ -3,6 +3,17 @@
 #include <sys/types.h>
 #include <winsock2.h>
 
+#if defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0600
+struct pollfd {
+	int fd;
+	short events;
+	short revents;
+};
+# ifndef HAVE_STRUCT_POLLFD_FD
+#  define HAVE_STRUCT_POLLFD_FD 1
+# endif
+#endif
+
 #ifndef HAVE_NFDS_T
 typedef unsigned int nfds_t;
 #endif
