@@ -3597,7 +3597,15 @@ elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
 		[Define if you want the OpenSSL internally seeded PRNG only])
 	RAND_MSG="OpenSSL internal ONLY"
 elif test "x$openssl" = "xno" ; then
-	AC_MSG_WARN([OpenSSH will use /dev/urandom as a source of random numbers. It will fail if this device is not supported or accessible])
+	case "$host" in
+	*-*-mingw*)
+		RAND_MSG="Win32 native"
+		;;
+	*)
+		RAND_MSG="/dev/urandom"
+		AC_MSG_WARN([OpenSSH will use /dev/urandom as a source of random numbers. It will fail if this device is not supported or accessible])
+		;;
+	esac
 else
 	AC_MSG_ERROR([OpenSSH has no source of random numbers. Please configure OpenSSL with an entropy source or re-run configure using one of the --with-prngd-port or --with-prngd-socket options])
 fi

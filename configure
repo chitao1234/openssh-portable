@@ -20176,8 +20176,16 @@ printf "%s\n" "#define OPENSSL_PRNG_ONLY 1" >>confdefs.h
 
 	RAND_MSG="OpenSSL internal ONLY"
 elif test "x$openssl" = "xno" ; then
-	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: OpenSSH will use /dev/urandom as a source of random numbers. It will fail if this device is not supported or accessible" >&5
+	case "$host" in
+	*-*-mingw*)
+		RAND_MSG="Win32 native"
+		;;
+	*)
+		RAND_MSG="/dev/urandom"
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: OpenSSH will use /dev/urandom as a source of random numbers. It will fail if this device is not supported or accessible" >&5
 printf "%s\n" "$as_me: WARNING: OpenSSH will use /dev/urandom as a source of random numbers. It will fail if this device is not supported or accessible" >&2;}
+		;;
+	esac
 else
 	as_fn_error $? "OpenSSH has no source of random numbers. Please configure OpenSSL with an entropy source or re-run configure using one of the --with-prngd-port or --with-prngd-socket options" "$LINENO" 5
 fi
