@@ -28,6 +28,7 @@
 #include "authfile.h"
 #include "log.h"
 #include "misc.h"
+#include "xmalloc.h"
 #include "sshbuf.h"
 #include "sshsig.h"
 #include "ssherr.h"
