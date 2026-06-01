@@ -18,7 +18,16 @@ top_srcdir=@top_srcdir@
 abs_top_srcdir=@abs_top_srcdir@
 abs_top_builddir=@abs_top_builddir@
 
-VPATH=@srcdir@
+vpath %.c @srcdir@
+vpath %.h @srcdir@
+vpath %.in @srcdir@
+vpath %.0 @srcdir@
+vpath %.1 @srcdir@
+vpath %.5 @srcdir@
+vpath %.8 @srcdir@
+vpath moduli @srcdir@
+vpath ssh_config @srcdir@
+vpath sshd_config @srcdir@
 SSH_PROGRAM=@bindir@/ssh
 ASKPASS_PROGRAM=$(libexecdir)/ssh-askpass
 SFTP_SERVER=$(libexecdir)/sftp-server
