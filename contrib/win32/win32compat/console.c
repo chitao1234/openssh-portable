@@ -42,6 +42,7 @@
 #include "console.h"
 #include "ansiprsr.h"
 #include "misc_internal.h"
+#include "w32api_proxies.h"
 
 DWORD	stdin_dwSavedAttributes = 0;
 DWORD	stdout_dwSavedAttributes = 0;
@@ -1627,7 +1628,7 @@ ConSaveWindowsState()
 	CONSOLE_SCREEN_BUFFER_INFOEX csbiex;
 	csbiex.cbSize = sizeof(CONSOLE_SCREEN_BUFFER_INFOEX);
 
-	if (!GetConsoleScreenBufferInfoEx(GetConsoleOutputHandle(), &csbiex))
+	if (!pGetConsoleScreenBufferInfoEx(GetConsoleOutputHandle(), &csbiex))
 		return;
 
 	SavedWindowState = csbiex;

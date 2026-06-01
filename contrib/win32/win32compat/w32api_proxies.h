@@ -25,8 +25,8 @@ BOOL pCancelIoEx(HANDLE, LPOVERLAPPED);
 BOOL pCancelSynchronousIo(HANDLE);
 BOOLEAN pCreateSymbolicLinkW(LPCWSTR, LPCWSTR, DWORD);
 DWORD pGetFinalPathNameByHandleW(HANDLE, LPWSTR, DWORD, DWORD);
+BOOL pGetConsoleScreenBufferInfoEx(HANDLE, PCONSOLE_SCREEN_BUFFER_INFOEX);
 ULONGLONG pGetTickCount64(void);
 BOOL pIsWindowsVistaOrGreater(void);
 BOOL pIsWindows8OrGreater(void);
 LSTATUS pRegGetValueW(HKEY, LPCWSTR, LPCWSTR, DWORD, LPDWORD, PVOID, LPDWORD);
-

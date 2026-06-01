@@ -404,6 +404,43 @@ pGetFinalPathNameByHandleW(HANDLE handle, LPWSTR path_buf, DWORD path_buf_len, D
 	return fallback_final_path_name_by_handle(handle, path_buf, path_buf_len);
 }
 
+BOOL
+pGetConsoleScreenBufferInfoEx(HANDLE handle, PCONSOLE_SCREEN_BUFFER_INFOEX console_info)
+{
+	typedef BOOL (WINAPI *GetConsoleScreenBufferInfoExType)(HANDLE, PCONSOLE_SCREEN_BUFFER_INFOEX);
+	static GetConsoleScreenBufferInfoExType s_pGetConsoleScreenBufferInfoEx = NULL;
+	static int s_init = 0;
+	HMODULE hm = NULL;
+	CONSOLE_SCREEN_BUFFER_INFO basic_info;
+	ULONG cb_size;
+
+	if (!s_init) {
+		s_init = 1;
+		if ((hm = load_kernel32()) != NULL)
+			s_pGetConsoleScreenBufferInfoEx = (GetConsoleScreenBufferInfoExType)get_proc_address(hm, "GetConsoleScreenBufferInfoEx");
+	}
+
+	if (s_pGetConsoleScreenBufferInfoEx != NULL)
+		return s_pGetConsoleScreenBufferInfoEx(handle, console_info);
+
+	if (console_info == NULL) {
+		SetLastError(ERROR_INVALID_PARAMETER);
+		return FALSE;
+	}
+	if (!GetConsoleScreenBufferInfo(handle, &basic_info))
+		return FALSE;
+
+	cb_size = console_info->cbSize;
+	memset(console_info, 0, sizeof(*console_info));
+	console_info->cbSize = cb_size != 0 ? cb_size : sizeof(*console_info);
+	console_info->dwSize = basic_info.dwSize;
+	console_info->dwCursorPosition = basic_info.dwCursorPosition;
+	console_info->wAttributes = basic_info.wAttributes;
+	console_info->srWindow = basic_info.srWindow;
+	console_info->dwMaximumWindowSize = basic_info.dwMaximumWindowSize;
+	return TRUE;
+}
+
 ULONGLONG
 pGetTickCount64(void)
 {

@@ -42,6 +42,7 @@
 #include <process.h>
 #include "misc_internal.h"
 #include "utf.h"
+#include "w32api_proxies.h"
 
 #define MAX_CONSOLE_COLUMNS 9999
 #define MAX_CONSOLE_ROWS 9999
@@ -328,7 +329,7 @@ ConSRWidth()
 	ZeroMemory(&consoleBufferInfo, sizeof(consoleBufferInfo));
 	consoleBufferInfo.cbSize = sizeof(consoleBufferInfo);
 
-	GetConsoleScreenBufferInfoEx(child_out, &consoleBufferInfo);
+	pGetConsoleScreenBufferInfoEx(child_out, &consoleBufferInfo);
 	return consoleBufferInfo.srWindow.Right;
 }
 
@@ -763,7 +764,7 @@ SizeWindow(HANDLE hInput)
 	ZeroMemory(&consoleInfo, sizeof(consoleInfo));
 	consoleInfo.cbSize = sizeof(consoleInfo);
 
-	bSuccess = GetConsoleScreenBufferInfoEx(hInput, &consoleInfo);
+	bSuccess = pGetConsoleScreenBufferInfoEx(hInput, &consoleInfo);
 
 	/* Get the largest size we can size the console window to */
 	coordScreen = GetLargestConsoleWindowSize(hInput);
@@ -789,7 +790,7 @@ SizeWindow(HANDLE hInput)
 			bSuccess = SetConsoleWindowInfo(hInput, TRUE, &srWindowRect);
 	}
 
-	bSuccess = GetConsoleScreenBufferInfoEx(hInput, &consoleInfo);
+	bSuccess = pGetConsoleScreenBufferInfoEx(hInput, &consoleInfo);
 }
 
 unsigned __stdcall
@@ -900,7 +901,7 @@ ProcessEvent(void *p)
 	ZeroMemory(&consoleInfo, sizeof(consoleInfo));
 	consoleInfo.cbSize = sizeof(consoleInfo);
 
-	GetConsoleScreenBufferInfoEx(child_out, &consoleInfo);
+	pGetConsoleScreenBufferInfoEx(child_out, &consoleInfo);
 
 	UINT viewPortHeight = consoleInfo.srWindow.Bottom - consoleInfo.srWindow.Top + 1;
 	UINT viewPortWidth = consoleInfo.srWindow.Right - consoleInfo.srWindow.Left + 1;
@@ -1094,7 +1095,7 @@ ProcessEventQueue(LPVOID p)
 			consoleInfo.cbSize = sizeof(consoleInfo);
 
 			/* This information is the live buffer that's currently in use */
-			GetConsoleScreenBufferInfoEx(child_out, &consoleInfo);
+			pGetConsoleScreenBufferInfoEx(child_out, &consoleInfo);
 
 			/* Set the cursor to the last known good location according to the live buffer */
 			if (lastX != consoleInfo.dwCursorPosition.X ||
@@ -1227,7 +1228,7 @@ ProcessMessages(void* p)
 	child_err = child_out;
 	SizeWindow(child_out);
 	/* Get the current buffer information after all the adjustments */
-	GetConsoleScreenBufferInfoEx(child_out, &consoleInfo);
+	pGetConsoleScreenBufferInfoEx(child_out, &consoleInfo);
 	/* Loop for the console output events */
 	while (GetMessage(&msg, NULL, 0, 0)) {
 		if (msg.message == WM_APPEXIT)
