@@ -54,6 +54,16 @@ PATHS= -DSSHDIR=\"$(sysconfdir)\" \
 	-D_PATH_SSH_SK_HELPER=\"$(SSH_SK_HELPER)\" \
 	-D_PATH_SSH_PIDDIR=\"$(piddir)\" \
 	-D_PATH_PRIVSEP_CHROOT_DIR=\"$(PRIVSEP_PATH)\"
+ifneq (@WIN32COMPAT_LIB@,)
+PATHS= -DSSHDIR=\"__PROGRAMDATA__\\\\ssh\" \
+	-D_PATH_SSH_PROGRAM=\"ssh.exe\" \
+	-D_PATH_SFTP_SERVER=\"sftp-server.exe\" \
+	-D_PATH_SSH_PIDDIR=\"__PROGRAMDATA__\\\\ssh\" \
+	-D_PATH_PRIVSEP_CHROOT_DIR=\".\" \
+	-D_PATH_LS=\"dir\" \
+	-D_PATH_DEVNULL=\"NUL\" \
+	-D_PATH_TTY=\"conin$$\"
+endif
 
 CC=@CC@
 LD=@LD@

@@ -5525,8 +5525,15 @@ AC_ARG_WITH([pid-dir],
 	]
 )
 
-AC_DEFINE_UNQUOTED([_PATH_SSH_PIDDIR], ["$piddir"],
-	[Specify location of ssh.pid])
+case "$host" in
+*-*-mingw*)
+	:
+	;;
+*)
+	AC_DEFINE_UNQUOTED([_PATH_SSH_PIDDIR], ["$piddir"],
+		[Specify location of ssh.pid])
+	;;
+esac
 AC_SUBST([piddir])
 
 

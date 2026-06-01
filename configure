@@ -25850,9 +25850,16 @@ printf "%s\n" "$as_me: WARNING: ** no $piddir directory on this system **" >&2;}
 fi
 
 
+case "$host" in
+*-*-mingw*)
+	:
+	;;
+*)
 
 printf "%s\n" "#define _PATH_SSH_PIDDIR \"$piddir\"" >>confdefs.h
 
+	;;
+esac
 
 
 
