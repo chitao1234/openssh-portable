@@ -31,6 +31,7 @@
 #include "agent.h"
 #include "agent-request.h"
 #include "config.h"
+#include "w32api_proxies.h"
 
 #pragma warning(push, 3)
 
@@ -113,7 +114,7 @@ agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPED* ol
 void 
 agent_connection_disconnect(struct agent_connection* con) 
 {
-	CancelIoEx(con->pipe_handle, NULL);
+	pCancelIoEx(con->pipe_handle, NULL);
 	DisconnectNamedPipe(con->pipe_handle);
 }
 
