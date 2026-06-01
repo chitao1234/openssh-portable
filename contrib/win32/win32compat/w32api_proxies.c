@@ -700,6 +700,34 @@ NTSTATUS pLsaRemoveAccountRights(LSA_HANDLE lsa_h,
 	return s_pLsaRemoveAccountRights(lsa_h, psid, all_rights, rights, num_rights);
 }
 
+NTSTATUS
+pLsaManageSidNameMapping(LSA_SID_NAME_MAPPING_OPERATION_TYPE op_type,
+	PLSA_SID_NAME_MAPPING_OPERATION_INPUT op_input,
+	PLSA_SID_NAME_MAPPING_OPERATION_OUTPUT *op_output)
+{
+	HMODULE hm = NULL;
+	typedef NTSTATUS (WINAPI *LsaManageSidNameMappingType)(
+		LSA_SID_NAME_MAPPING_OPERATION_TYPE,
+		PLSA_SID_NAME_MAPPING_OPERATION_INPUT,
+		PLSA_SID_NAME_MAPPING_OPERATION_OUTPUT *);
+	static LsaManageSidNameMappingType s_pLsaManageSidNameMapping = NULL;
+	static int s_init = 0;
+
+	if (!s_init) {
+		s_init = 1;
+		if ((hm = load_secur32()) != NULL)
+			s_pLsaManageSidNameMapping = (LsaManageSidNameMappingType)get_proc_address(hm, "LsaManageSidNameMapping");
+		if (s_pLsaManageSidNameMapping == NULL && (hm = load_advapi32()) != NULL)
+			s_pLsaManageSidNameMapping = (LsaManageSidNameMappingType)get_proc_address(hm, "LsaManageSidNameMapping");
+		if (s_pLsaManageSidNameMapping == NULL && (hm = load_api_security_lsapolicy()) != NULL)
+			s_pLsaManageSidNameMapping = (LsaManageSidNameMappingType)get_proc_address(hm, "LsaManageSidNameMapping");
+	}
+	if (s_pLsaManageSidNameMapping == NULL)
+		return STATUS_ASSERTION_FAILURE;
+
+	return s_pLsaManageSidNameMapping(op_type, op_input, op_output);
+}
+
 ULONG pRtlNtStatusToDosError(NTSTATUS status)
 {
 	HMODULE hm = NULL;

@@ -478,7 +478,7 @@ add_sid_mapping_to_lsa(PUNICODE_STRING domain_name,
 		input.AddInput.AccountName = *account_name;
 	input.AddInput.Sid = sid;
 
-	status = LsaManageSidNameMapping(LsaSidNameMappingOperation_Add,
+	status = pLsaManageSidNameMapping(LsaSidNameMappingOperation_Add,
 		&input,
 		&p_output);
 	if (status != STATUS_SUCCESS) {
@@ -517,7 +517,7 @@ int remove_virtual_account_lsa_mapping(PUNICODE_STRING domain_name,
 	if (account_name)
 		remove_input->AccountName = *account_name;
 	
-	NTSTATUS status = LsaManageSidNameMapping(LsaSidNameMappingOperation_Remove,
+	NTSTATUS status = pLsaManageSidNameMapping(LsaSidNameMappingOperation_Remove,
 		&input,
 		&p_output);
 	if (status != STATUS_SUCCESS)
