@@ -30,6 +30,8 @@
 
 #include "sys/types.h"
 
+struct passwd;
+
 /* uuidswap.c defs */
 void
 temporarily_use_uid(struct passwd *pw)
