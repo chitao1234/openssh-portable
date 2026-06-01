@@ -1913,6 +1913,8 @@ sftp_server_cleanup_exit(int i)
 }
 
 #ifdef WINDOWS
+extern char *__progname;
+
 void
 log_handler(LogLevel level, int forced, const char* msg, void* ctx)
 {
