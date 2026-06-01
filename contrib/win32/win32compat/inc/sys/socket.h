@@ -65,3 +65,7 @@ void w32_freeaddrinfo(struct addrinfo *);
 int w32_getaddrinfo(const char *, const char *,
 	const struct addrinfo *, struct addrinfo **);
 #define getaddrinfo         w32_getaddrinfo
+
+int w32_getnameinfo(const struct sockaddr *, size_t, char *, size_t,
+	char *, size_t, int);
+#define getnameinfo         w32_getnameinfo

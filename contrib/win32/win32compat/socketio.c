@@ -1014,6 +1014,155 @@ w32_freeaddrinfo(struct addrinfo *ai)
 	}
 }
 
+static int
+copy_sockaddr_string(char *dst, size_t dstlen, const char *src)
+{
+	size_t srclen;
+
+	if (dst == NULL)
+		return 0;
+	srclen = strlen(src);
+	if (dstlen == 0 || srclen >= dstlen)
+		return EAI_MEMORY;
+	memcpy(dst, src, srclen + 1);
+	return 0;
+}
+
+const char *
+w32_inet_ntop(int af, const void *src, char *dst, socklen_t size)
+{
+	struct in_addr in;
+	struct sockaddr_in6 sin6;
+	DWORD len;
+	const char *addr;
+
+	if (dst == NULL || size <= 0) {
+		errno = ENOSPC;
+		return NULL;
+	}
+
+	switch (af) {
+	case AF_INET:
+		memcpy(&in, src, sizeof(in));
+		addr = inet_ntoa(in);
+		if (addr == NULL)
+			return NULL;
+		if (strlen(addr) >= (size_t)size) {
+			errno = ENOSPC;
+			return NULL;
+		}
+		strcpy_s(dst, (size_t)size, addr);
+		return dst;
+	case AF_INET6:
+		memset(&sin6, 0, sizeof(sin6));
+		sin6.sin6_family = AF_INET6;
+		memcpy(&sin6.sin6_addr, src, sizeof(sin6.sin6_addr));
+		len = (DWORD)size;
+		if (WSAAddressToStringA((LPSOCKADDR)&sin6, sizeof(sin6), NULL, dst, &len) == 0)
+			return dst;
+		errno = errno_from_WSAError(WSAGetLastError());
+		return NULL;
+	default:
+		errno = EAFNOSUPPORT;
+		return NULL;
+	}
+}
+
+static int
+w32_getnameinfo_numeric_host(const struct sockaddr *sa, size_t salen, char *host, size_t hostlen)
+{
+	const struct sockaddr_in *sin;
+	const struct sockaddr_in6 *sin6;
+
+	if (host == NULL)
+		return 0;
+
+	switch (sa->sa_family) {
+	case AF_INET:
+		if (salen < sizeof(*sin))
+			return EAI_FAMILY;
+		sin = (const struct sockaddr_in *)sa;
+		return w32_inet_ntop(AF_INET, &sin->sin_addr, host, (socklen_t)hostlen) == NULL ? EAI_MEMORY : 0;
+	case AF_INET6:
+		if (salen < sizeof(*sin6))
+			return EAI_FAMILY;
+		sin6 = (const struct sockaddr_in6 *)sa;
+		return w32_inet_ntop(AF_INET6, &sin6->sin6_addr, host, (socklen_t)hostlen) == NULL ? EAI_MEMORY : 0;
+	default:
+		return EAI_FAMILY;
+	}
+}
+
+int
+w32_getnameinfo(const struct sockaddr *sa, size_t salen, char *host, size_t hostlen,
+	char *serv, size_t servlen, int flags)
+{
+	typedef int (WSAAPI *GetNameInfoType)(const struct sockaddr *, socklen_t,
+	    char *, DWORD, char *, DWORD, int);
+	static GetNameInfoType s_pGetNameInfo = NULL;
+	static int s_init = 0;
+	HMODULE hm;
+	const struct sockaddr_in *sin;
+	struct servent *se;
+	char servbuf[16];
+	int ret;
+
+	if (!s_init) {
+		s_init = 1;
+		if ((hm = LoadLibraryW(L"ws2_32.dll")) != NULL)
+			s_pGetNameInfo = (GetNameInfoType)GetProcAddress(hm, "getnameinfo");
+	}
+	if (s_pGetNameInfo != NULL)
+		return s_pGetNameInfo(sa, (socklen_t)salen, host, (DWORD)hostlen,
+		    serv, (DWORD)servlen, flags);
+
+	if (sa == NULL)
+		return EAI_FAIL;
+
+	if (serv != NULL) {
+		if (sa->sa_family != AF_INET && sa->sa_family != AF_INET6)
+			return EAI_FAMILY;
+		if (salen < (sa->sa_family == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6)))
+			return EAI_FAMILY;
+		if ((flags & NI_NUMERICSERV) == 0) {
+			u_short port = sa->sa_family == AF_INET ?
+			    ((const struct sockaddr_in *)sa)->sin_port :
+			    ((const struct sockaddr_in6 *)sa)->sin6_port;
+			se = getservbyport(port, (flags & NI_DGRAM) ? "udp" : "tcp");
+			if (se != NULL) {
+				ret = copy_sockaddr_string(serv, servlen, se->s_name);
+				if (ret != 0)
+					return ret;
+				goto host_lookup;
+			}
+		}
+		snprintf(servbuf, sizeof(servbuf), "%u", sa->sa_family == AF_INET ?
+		    ntohs(((const struct sockaddr_in *)sa)->sin_port) :
+		    ntohs(((const struct sockaddr_in6 *)sa)->sin6_port));
+		ret = copy_sockaddr_string(serv, servlen, servbuf);
+		if (ret != 0)
+			return ret;
+	}
+
+host_lookup:
+	if (host == NULL)
+		return 0;
+	if ((flags & NI_NUMERICHOST) != 0)
+		return w32_getnameinfo_numeric_host(sa, salen, host, hostlen);
+	if (sa->sa_family == AF_INET) {
+		struct hostent *hp;
+		if (salen < sizeof(*sin))
+			return EAI_FAMILY;
+		sin = (const struct sockaddr_in *)sa;
+		hp = gethostbyaddr((const char *)&sin->sin_addr, sizeof(sin->sin_addr), AF_INET);
+		if (hp != NULL)
+			return copy_sockaddr_string(host, hostlen, hp->h_name);
+		if ((flags & NI_NAMEREQD) != 0)
+			return EAI_NONAME;
+	}
+	return w32_getnameinfo_numeric_host(sa, salen, host, hostlen);
+}
+
 int
 w32_getaddrinfo(const char *node_utf8, const char *service_utf8,
 		const struct addrinfo *hints, struct addrinfo **res)

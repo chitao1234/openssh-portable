@@ -3,4 +3,7 @@
 
 #include <sys/socket.h>
 
+const char *w32_inet_ntop(int, const void *, char *, socklen_t);
+#define inet_ntop(a,b,c,d) w32_inet_ntop((a), (b), (c), (d))
+
 #endif
