@@ -707,6 +707,9 @@ regress-prep:
 
 REGRESSLIBS=libssh.a $(LIBCOMPAT)
 TESTLIBS=$(LIBS) $(CHANNELLIBS)
+ifneq ($(WIN32COMPATLIB),)
+TESTLIBS=$(WIN32COMPATLIB) $(LIBS) $(CHANNELLIBS)
+endif
 
 regress/modpipe$(EXEEXT): $(srcdir)/regress/modpipe.c $(REGRESSLIBS)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $(srcdir)/regress/modpipe.c \
@@ -896,7 +899,7 @@ SSH_VERIFY_ATTESTATION_OBJS=\
 ssh-verify-attestation: regress/misc/ssh-verify-attestation/ssh-verify-attestation$(EXEEXT)
 
 regress/misc/ssh-verify-attestation/ssh-verify-attestation$(EXEEXT): $(LIBCOMPAT) libssh.a $(SSH_VERIFY_ATTESTATION_OBJS)
-	$(LD) -o $@ $(SSH_VERIFY_ATTESTATION_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS) $(CHANNELLIBS) $(LIBFIDO2)
+	$(LD) -o $@ $(SSH_VERIFY_ATTESTATION_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(TESTLIBS) $(LIBFIDO2)
 
 
 regress-binaries: regress-prep $(LIBCOMPAT) \
