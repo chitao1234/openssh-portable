@@ -35,6 +35,8 @@
 #include <userenv.h>
 #include "../misc_internal.h"
 #include <pwd.h>
+#include "sshbuf.h"
+#include "sshkey.h"
 #include "xmalloc.h"
 
 #define BUFSIZE 5 * 1024
