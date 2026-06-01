@@ -42,6 +42,16 @@
 #define INTERNAL_RECV_BUFFER_SIZE 70*1024 //70KB
 #define errno_from_WSALastError() errno_from_WSAError(WSAGetLastError())
 
+#ifndef EAI_BADFLAGS
+#define EAI_BADFLAGS EAI_FAIL
+#endif
+#ifndef EAI_SERVICE
+#define EAI_SERVICE EAI_NONAME
+#endif
+#ifndef EAI_SOCKTYPE
+#define EAI_SOCKTYPE EAI_FAIL
+#endif
+
 /* state info that needs to be persisted for an inprocess acceptEx call*/
 struct acceptEx_context {
 	char lpOutputBuf[1024];
@@ -1163,54 +1173,89 @@ host_lookup:
 	return w32_getnameinfo_numeric_host(sa, salen, host, hostlen);
 }
 
-int
-w32_getaddrinfo(const char *node_utf8, const char *service_utf8,
-		const struct addrinfo *hints, struct addrinfo **res)
+typedef INT (WSAAPI *GetAddrInfoWType)(PCWSTR, PCWSTR, const ADDRINFOW *,
+    PADDRINFOW *);
+typedef VOID (WSAAPI *FreeAddrInfoWType)(PADDRINFOW);
+
+static int
+w32_load_getaddrinfoW(GetAddrInfoWType *getaddrinfoW,
+    FreeAddrInfoWType *freeaddrinfoW)
+{
+	static GetAddrInfoWType s_pGetAddrInfoW = NULL;
+	static FreeAddrInfoWType s_pFreeAddrInfoW = NULL;
+	static int s_init = 0;
+	HMODULE hm;
+
+	if (!s_init) {
+		s_init = 1;
+		if ((hm = LoadLibraryW(L"ws2_32.dll")) != NULL) {
+			s_pGetAddrInfoW = (GetAddrInfoWType)GetProcAddress(hm,
+			    "GetAddrInfoW");
+			s_pFreeAddrInfoW = (FreeAddrInfoWType)GetProcAddress(hm,
+			    "FreeAddrInfoW");
+		}
+	}
+
+	*getaddrinfoW = s_pGetAddrInfoW;
+	*freeaddrinfoW = s_pFreeAddrInfoW;
+	return s_pGetAddrInfoW != NULL && s_pFreeAddrInfoW != NULL;
+}
+
+static int
+w32_copy_addrinfoW(struct addrinfoW *info_w, struct addrinfo **res)
+{
+	struct addrinfoW **cur_w = &info_w;
+	struct addrinfo **cur = res;
+	struct addrinfo *dst;
+	int ret = 0;
+
+	while (*cur_w) {
+		if ((*cur = calloc(1, sizeof(struct addrinfo))) == NULL)
+			return EAI_MEMORY;
+		dst = *cur;
+		dst->ai_flags = (*cur_w)->ai_flags;
+		dst->ai_family = (*cur_w)->ai_family;
+		dst->ai_socktype = (*cur_w)->ai_socktype;
+		dst->ai_protocol = (*cur_w)->ai_protocol;
+		dst->ai_addrlen = (*cur_w)->ai_addrlen;
+		if ((*cur_w)->ai_canonname != NULL &&
+		    (dst->ai_canonname =
+		    utf16_to_utf8((*cur_w)->ai_canonname)) == NULL)
+			return EAI_MEMORY;
+		if ((*cur_w)->ai_addrlen &&
+		    (dst->ai_addr = malloc((*cur_w)->ai_addrlen)) == NULL)
+			return EAI_MEMORY;
+		if ((*cur_w)->ai_addrlen &&
+		    memcpy_s(dst->ai_addr, (*cur_w)->ai_addrlen,
+		    (*cur_w)->ai_addr, (*cur_w)->ai_addrlen))
+			return EAI_MEMORY;
+		cur_w = &(*cur_w)->ai_next;
+		cur = &dst->ai_next;
+	}
+
+	return ret;
+}
+
+static int
+w32_getaddrinfo_modern(const char *node_utf8, const char *service_utf8,
+    const struct addrinfo *hints, struct addrinfo **res,
+    GetAddrInfoWType getaddrinfoW, FreeAddrInfoWType freeaddrinfoW)
 {
 	int ret = 0;
 	wchar_t *node_utf16 = NULL, *service_utf16 = NULL;
 	struct addrinfoW *info_w = NULL;
-	*res = NULL;
 
 	if ((node_utf8 && (node_utf16 = utf8_to_utf16(node_utf8)) == NULL) ||
-		(service_utf8 && (service_utf16 = utf8_to_utf16(service_utf8)) == NULL)) {
+	    (service_utf8 && (service_utf16 = utf8_to_utf16(service_utf8)) == NULL)) {
 		ret = EAI_MEMORY;
 		goto done;
 	}
 
-	if ((ret = GetAddrInfoW(node_utf16, service_utf16, (ADDRINFOW*)hints, &info_w)) != 0)
+	if ((ret = getaddrinfoW(node_utf16, service_utf16, (ADDRINFOW*)hints,
+	    &info_w)) != 0)
 		goto done;
 
-	/* copy info_w to res */
-	{
-		struct addrinfoW **cur_w = &info_w;
-		struct addrinfo **cur = res;
-
-		while (*cur_w) {
-			if ((*cur = malloc(sizeof(struct addrinfo))) == NULL) {
-				ret = EAI_MEMORY;
-				goto done;
-			}
-			if (memcpy_s(*cur, sizeof(struct addrinfo), *cur_w, sizeof(struct addrinfo))) {
-				ret = EAI_MEMORY;
-				goto done;
-			}
-			(*cur)->ai_next = NULL;
-			if (((*cur_w)->ai_canonname && ((*cur)->ai_canonname = utf16_to_utf8((*cur_w)->ai_canonname)) == NULL) ||
-			    ((*cur_w)->ai_addrlen && ((*cur)->ai_addr = malloc((*cur_w)->ai_addrlen)) == NULL)) {
-				ret = EAI_MEMORY;
-				goto done;
-
-			}
-			if ((*cur_w)->ai_addrlen)
-				if (memcpy_s((*cur)->ai_addr, (*cur_w)->ai_addrlen, (*cur_w)->ai_addr, (*cur_w)->ai_addrlen)) {
-					ret = EAI_MEMORY;
-					goto done;
-				}
-			cur_w = &(*cur_w)->ai_next;
-			cur = &(*cur)->ai_next;
-		}
-	}
+	ret = w32_copy_addrinfoW(info_w, res);
 
 done:
 	if (node_utf16)
@@ -1218,10 +1263,196 @@ done:
 	if (service_utf16)
 		free(service_utf16);
 	if (info_w)
-		FreeAddrInfoW(info_w);
+		freeaddrinfoW(info_w);
 	if (ret != 0 && *res) {
 		w32_freeaddrinfo(*res);
 		*res = NULL;
 	}
 	return ret;
+}
+
+static int
+w32_addrinfo_flags_supported(int flags)
+{
+	int supported_flags = AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST;
+
+#ifdef AI_NUMERICSERV
+	supported_flags |= AI_NUMERICSERV;
+#endif
+#ifdef AI_ADDRCONFIG
+	supported_flags |= AI_ADDRCONFIG;
+#endif
+
+	return (flags & ~supported_flags) == 0;
+}
+
+static int
+w32_addrinfo_socktype_protocol(const struct addrinfo *hints, int *socktype,
+    int *protocol)
+{
+	*socktype = hints != NULL ? hints->ai_socktype : 0;
+	*protocol = hints != NULL ? hints->ai_protocol : 0;
+
+	if (*socktype == 0) {
+		if (*protocol == IPPROTO_UDP)
+			*socktype = SOCK_DGRAM;
+		else
+			*socktype = SOCK_STREAM;
+	}
+	if (*socktype != SOCK_STREAM && *socktype != SOCK_DGRAM)
+		return EAI_SOCKTYPE;
+	if (*protocol == 0)
+		*protocol = *socktype == SOCK_DGRAM ? IPPROTO_UDP : IPPROTO_TCP;
+	if ((*socktype == SOCK_STREAM && *protocol != IPPROTO_TCP) ||
+	    (*socktype == SOCK_DGRAM && *protocol != IPPROTO_UDP))
+		return EAI_SERVICE;
+	return 0;
+}
+
+static int
+w32_addrinfo_parse_service(const char *service, int flags, int socktype,
+    int protocol, u_short *port)
+{
+	struct servent *se;
+	const char *proto = NULL;
+	char *end;
+	unsigned long n;
+
+	*port = 0;
+	if (service == NULL)
+		return 0;
+
+	errno = 0;
+	n = strtoul(service, &end, 10);
+	if (service[0] != '\0' && *end == '\0' && errno != ERANGE &&
+	    n <= 65535) {
+		*port = htons((u_short)n);
+		return 0;
+	}
+#ifdef AI_NUMERICSERV
+	if ((flags & AI_NUMERICSERV) != 0)
+		return EAI_NONAME;
+#endif
+
+	if (socktype == SOCK_DGRAM || protocol == IPPROTO_UDP)
+		proto = "udp";
+	else if (socktype == SOCK_STREAM || protocol == IPPROTO_TCP)
+		proto = "tcp";
+	if ((se = getservbyname(service, proto)) == NULL)
+		return EAI_SERVICE;
+	*port = se->s_port;
+	return 0;
+}
+
+static struct addrinfo *
+w32_addrinfo_alloc_ipv4(u_long addr, u_short port, int flags, int socktype,
+    int protocol, const char *canonname)
+{
+	struct addrinfo *ai;
+	struct sockaddr_in *sin;
+
+	if ((ai = calloc(1, sizeof(*ai))) == NULL)
+		return NULL;
+	if ((sin = calloc(1, sizeof(*sin))) == NULL) {
+		free(ai);
+		return NULL;
+	}
+
+	sin->sin_family = AF_INET;
+	sin->sin_port = port;
+	sin->sin_addr.s_addr = addr;
+	ai->ai_flags = flags;
+	ai->ai_family = AF_INET;
+	ai->ai_socktype = socktype;
+	ai->ai_protocol = protocol;
+	ai->ai_addrlen = sizeof(*sin);
+	ai->ai_addr = (struct sockaddr *)sin;
+	if (canonname != NULL && (ai->ai_canonname = _strdup(canonname)) == NULL) {
+		w32_freeaddrinfo(ai);
+		return NULL;
+	}
+	return ai;
+}
+
+static int
+w32_getaddrinfo_legacy(const char *node, const char *service,
+    const struct addrinfo *hints, struct addrinfo **res)
+{
+	struct hostent *hp;
+	struct in_addr in;
+	struct addrinfo *cur, *prev;
+	u_short port;
+	u_long addr;
+	int flags, family, socktype, protocol, ret, i, numeric_host;
+
+	flags = hints != NULL ? hints->ai_flags : 0;
+	family = hints != NULL ? hints->ai_family : AF_UNSPEC;
+	if (family != AF_UNSPEC && family != AF_INET)
+		return EAI_FAMILY;
+	if (!w32_addrinfo_flags_supported(flags))
+		return EAI_BADFLAGS;
+	if ((ret = w32_addrinfo_socktype_protocol(hints, &socktype,
+	    &protocol)) != 0)
+		return ret;
+	if ((ret = w32_addrinfo_parse_service(service, flags, socktype,
+	    protocol, &port)) != 0)
+		return ret;
+
+	if (node == NULL) {
+		addr = (flags & AI_PASSIVE) ? htonl(INADDR_ANY) :
+		    htonl(INADDR_LOOPBACK);
+		*res = w32_addrinfo_alloc_ipv4(addr, port, flags, socktype,
+		    protocol, NULL);
+		return *res == NULL ? EAI_MEMORY : 0;
+	}
+
+	numeric_host = 0;
+	addr = inet_addr(node);
+	if (addr != INADDR_NONE || strcmp(node, "255.255.255.255") == 0)
+		numeric_host = 1;
+	if (numeric_host) {
+		*res = w32_addrinfo_alloc_ipv4(addr, port, flags, socktype,
+		    protocol, (flags & AI_CANONNAME) ? node : NULL);
+		return *res == NULL ? EAI_MEMORY : 0;
+	}
+	if ((flags & AI_NUMERICHOST) != 0)
+		return EAI_NONAME;
+
+	if ((hp = gethostbyname(node)) == NULL || hp->h_addrtype != AF_INET ||
+	    hp->h_length != sizeof(in) || hp->h_addr_list == NULL ||
+	    hp->h_addr_list[0] == NULL)
+		return EAI_NONAME;
+
+	prev = *res = NULL;
+	for (i = 0; hp->h_addr_list[i] != NULL; i++) {
+		memcpy(&in, hp->h_addr_list[i], sizeof(in));
+		cur = w32_addrinfo_alloc_ipv4(in.s_addr, port, flags, socktype,
+		    protocol, (i == 0 && (flags & AI_CANONNAME)) ?
+		    hp->h_name : NULL);
+		if (cur == NULL) {
+			w32_freeaddrinfo(*res);
+			*res = NULL;
+			return EAI_MEMORY;
+		}
+		if (prev == NULL)
+			*res = cur;
+		else
+			prev->ai_next = cur;
+		prev = cur;
+	}
+	return 0;
+}
+
+int
+w32_getaddrinfo(const char *node_utf8, const char *service_utf8,
+		const struct addrinfo *hints, struct addrinfo **res)
+{
+	GetAddrInfoWType getaddrinfoW;
+	FreeAddrInfoWType freeaddrinfoW;
+	*res = NULL;
+
+	if (w32_load_getaddrinfoW(&getaddrinfoW, &freeaddrinfoW))
+		return w32_getaddrinfo_modern(node_utf8, service_utf8, hints,
+		    res, getaddrinfoW, freeaddrinfoW);
+	return w32_getaddrinfo_legacy(node_utf8, service_utf8, hints, res);
 }
