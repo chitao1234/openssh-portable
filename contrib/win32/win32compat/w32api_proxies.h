@@ -32,4 +32,7 @@ BOOL pGetNamedPipeClientProcessId(HANDLE, PULONG);
 ULONGLONG pGetTickCount64(void);
 BOOL pIsWindowsVistaOrGreater(void);
 BOOL pIsWindows8OrGreater(void);
+LSTATUS pRegDeleteKeyExA(HKEY, LPCSTR, REGSAM, DWORD);
+LSTATUS pRegDeleteTreeA(HKEY, LPCSTR);
+LSTATUS pRegDeleteTreeW(HKEY, LPCWSTR);
 LSTATUS pRegGetValueW(HKEY, LPCWSTR, LPCWSTR, DWORD, LPDWORD, PVOID, LPDWORD);

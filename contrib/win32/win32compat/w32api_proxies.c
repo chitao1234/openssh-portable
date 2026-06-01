@@ -515,6 +515,135 @@ pIsWindows8OrGreater(void)
 	return version_info.dwMinorVersion >= 2;
 }
 
+static LSTATUS
+fallback_reg_delete_tree_a(HKEY hkey, LPCSTR subkey)
+{
+	HKEY tree = hkey;
+	LSTATUS status;
+	char child_name[256];
+	DWORD child_name_len;
+
+	if (subkey != NULL && *subkey != '\0') {
+		status = RegOpenKeyExA(hkey, subkey, 0, DELETE | KEY_READ | KEY_WRITE, &tree);
+		if (status != ERROR_SUCCESS)
+			return status;
+	}
+
+	for (;;) {
+		child_name_len = (DWORD)(sizeof(child_name) / sizeof(child_name[0]));
+		status = RegEnumKeyExA(tree, 0, child_name, &child_name_len, NULL, NULL, NULL, NULL);
+		if (status == ERROR_NO_MORE_ITEMS) {
+			status = ERROR_SUCCESS;
+			break;
+		}
+		if (status != ERROR_SUCCESS)
+			break;
+		status = fallback_reg_delete_tree_a(tree, child_name);
+		if (status != ERROR_SUCCESS)
+			break;
+	}
+
+	if (tree != hkey)
+		RegCloseKey(tree);
+	if (status == ERROR_SUCCESS && subkey != NULL && *subkey != '\0')
+		status = RegDeleteKeyA(hkey, subkey);
+	return status;
+}
+
+static LSTATUS
+fallback_reg_delete_tree_w(HKEY hkey, LPCWSTR subkey)
+{
+	HKEY tree = hkey;
+	LSTATUS status;
+	wchar_t child_name[256];
+	DWORD child_name_len;
+
+	if (subkey != NULL && *subkey != L'\0') {
+		status = RegOpenKeyExW(hkey, subkey, 0, DELETE | KEY_READ | KEY_WRITE, &tree);
+		if (status != ERROR_SUCCESS)
+			return status;
+	}
+
+	for (;;) {
+		child_name_len = (DWORD)(sizeof(child_name) / sizeof(child_name[0]));
+		status = RegEnumKeyExW(tree, 0, child_name, &child_name_len, NULL, NULL, NULL, NULL);
+		if (status == ERROR_NO_MORE_ITEMS) {
+			status = ERROR_SUCCESS;
+			break;
+		}
+		if (status != ERROR_SUCCESS)
+			break;
+		status = fallback_reg_delete_tree_w(tree, child_name);
+		if (status != ERROR_SUCCESS)
+			break;
+	}
+
+	if (tree != hkey)
+		RegCloseKey(tree);
+	if (status == ERROR_SUCCESS && subkey != NULL && *subkey != L'\0')
+		status = RegDeleteKeyW(hkey, subkey);
+	return status;
+}
+
+LSTATUS
+pRegDeleteKeyExA(HKEY hkey, LPCSTR subkey, REGSAM sam_desired, DWORD reserved)
+{
+	typedef LSTATUS (WINAPI *RegDeleteKeyExAType)(HKEY, LPCSTR, REGSAM, DWORD);
+	static RegDeleteKeyExAType s_pRegDeleteKeyExA = NULL;
+	static int s_init = 0;
+	HMODULE hm = NULL;
+
+	if (!s_init) {
+		s_init = 1;
+		if ((hm = load_advapi32()) != NULL)
+			s_pRegDeleteKeyExA = (RegDeleteKeyExAType)get_proc_address(hm, "RegDeleteKeyExA");
+	}
+
+	if (s_pRegDeleteKeyExA != NULL)
+		return s_pRegDeleteKeyExA(hkey, subkey, sam_desired, reserved);
+	if (reserved != 0)
+		return ERROR_INVALID_PARAMETER;
+	return RegDeleteKeyA(hkey, subkey);
+}
+
+LSTATUS
+pRegDeleteTreeA(HKEY hkey, LPCSTR subkey)
+{
+	typedef LSTATUS (WINAPI *RegDeleteTreeAType)(HKEY, LPCSTR);
+	static RegDeleteTreeAType s_pRegDeleteTreeA = NULL;
+	static int s_init = 0;
+	HMODULE hm = NULL;
+
+	if (!s_init) {
+		s_init = 1;
+		if ((hm = load_advapi32()) != NULL)
+			s_pRegDeleteTreeA = (RegDeleteTreeAType)get_proc_address(hm, "RegDeleteTreeA");
+	}
+
+	if (s_pRegDeleteTreeA != NULL)
+		return s_pRegDeleteTreeA(hkey, subkey);
+	return fallback_reg_delete_tree_a(hkey, subkey);
+}
+
+LSTATUS
+pRegDeleteTreeW(HKEY hkey, LPCWSTR subkey)
+{
+	typedef LSTATUS (WINAPI *RegDeleteTreeWType)(HKEY, LPCWSTR);
+	static RegDeleteTreeWType s_pRegDeleteTreeW = NULL;
+	static int s_init = 0;
+	HMODULE hm = NULL;
+
+	if (!s_init) {
+		s_init = 1;
+		if ((hm = load_advapi32()) != NULL)
+			s_pRegDeleteTreeW = (RegDeleteTreeWType)get_proc_address(hm, "RegDeleteTreeW");
+	}
+
+	if (s_pRegDeleteTreeW != NULL)
+		return s_pRegDeleteTreeW(hkey, subkey);
+	return fallback_reg_delete_tree_w(hkey, subkey);
+}
+
 LSTATUS
 pRegGetValueW(HKEY hkey, LPCWSTR subkey, LPCWSTR value, DWORD flags, LPDWORD type, PVOID data, LPDWORD size)
 {

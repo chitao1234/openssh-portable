@@ -32,6 +32,7 @@
 #include "agent.h"
 #include "agent-request.h"
 #include "config.h"
+#include "w32api_proxies.h"
 #include <stdint.h>
 #include "digest.h"
 #include "match.h"
@@ -175,7 +176,7 @@ remove_matching_subkeys_from_registry(HKEY user_root, wchar_t const* key_name, w
 					goto done;
 				data[data_len] = '\0';
 				if (strncmp(data, value_data_to_remove, data_len) == 0) {
-					if (RegDeleteTreeW(root, sub_name) != 0)
+					if (pRegDeleteTreeW(root, sub_name) != 0)
 						goto done;
 					--index;
 				}
@@ -349,7 +350,7 @@ done:
 
 	/* delete created reg key if not succeeded*/
 	if ((success == 0) && reg && thumbprint)
-		RegDeleteKeyExA(reg, thumbprint, KEY_WOW64_64KEY, 0);
+		pRegDeleteKeyExA(reg, thumbprint, KEY_WOW64_64KEY, 0);
 
 	if (eblob)
 		free(eblob);
@@ -601,7 +602,7 @@ process_remove_key(struct sshbuf* request, struct sshbuf* response, struct agent
 	    get_user_root(con, &user_root) != 0 ||
 	    RegOpenKeyExW(user_root, SSH_KEYS_ROOT, 0,
 		DELETE | KEY_ENUMERATE_SUB_KEYS | KEY_QUERY_VALUE | KEY_WOW64_64KEY, &root) != 0 ||
-	    RegDeleteTreeA(root, thumbprint) != 0)
+	    pRegDeleteTreeA(root, thumbprint) != 0)
 		goto done;
 	success = 1;
 done:
@@ -633,8 +634,8 @@ process_remove_all(struct sshbuf* request, struct sshbuf* response, struct agent
 		goto done;
 	}
 
-	RegDeleteTreeW(root, SSH_KEYS_KEY);
-	RegDeleteTreeW(root, SSH_PKCS11_PROVIDERS_KEY);
+	pRegDeleteTreeW(root, SSH_KEYS_KEY);
+	pRegDeleteTreeW(root, SSH_PKCS11_PROVIDERS_KEY);
 done:
 	r = 0;
 	if (sshbuf_put_u8(response, SSH_AGENT_SUCCESS) != 0)
@@ -765,9 +766,9 @@ done:
 	/* delete created reg keys if not succeeded*/
 	if ((success == 0) && reg) {
 		if (thumbprint)
-			RegDeleteKeyExA(reg, thumbprint, KEY_WOW64_64KEY, 0);
+			pRegDeleteKeyExA(reg, thumbprint, KEY_WOW64_64KEY, 0);
 		if (canonical_provider)
-			RegDeleteKeyExA(reg, canonical_provider, KEY_WOW64_64KEY, 0);
+			pRegDeleteKeyExA(reg, canonical_provider, KEY_WOW64_64KEY, 0);
 	}
 
 	pkcs11_terminate();
