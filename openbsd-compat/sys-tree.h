@@ -26,7 +26,7 @@
 
 /* OPENBSD ORIGINAL: sys/sys/tree.h */
 
-#include "config.h"
+#include <config.h>
 #ifdef NO_ATTRIBUTE_ON_RETURN_TYPE
 # define __attribute__(x)
 #endif

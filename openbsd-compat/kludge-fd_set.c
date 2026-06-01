@@ -7,7 +7,7 @@
  * function compiled without _FORTIFY_SOURCE.
  */
 
-#include "config.h"
+#include <config.h>
 
 #if defined(HAVE_FEATURES_H) && defined(_FORTIFY_SOURCE)
 # include <features.h>
@@ -25,4 +25,3 @@ int kludge_FD_ISSET(int n, fd_set *set) {
 #  endif /* __GLIBC_PREREQ(2, 15) && (_FORTIFY_SOURCE > 0) */
 # endif /* __GNU_LIBRARY__ && __GLIBC_PREREQ */
 #endif /* HAVE_FEATURES_H && _FORTIFY_SOURCE */
-

@@ -41,7 +41,7 @@
 #include "sshfileperm.h"
 #include "Debug.h"
 #include "misc_internal.h"
-#include "config.h"
+#include <config.h>
 
 #define NULL_TERMINATOR_LEN		1
 #define COMMA_SPACE_LEN			2
