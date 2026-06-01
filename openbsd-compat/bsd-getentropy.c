@@ -43,12 +43,45 @@
 #include "log.h"
 
 #ifdef WINDOWS
+typedef BOOLEAN (APIENTRY *RtlGenRandomType)(PVOID, ULONG);
+
+static int
+w32_rtlgenrandom(void *s, size_t len)
+{
+	static RtlGenRandomType s_pRtlGenRandom = NULL;
+	static int s_init = 0;
+	HMODULE hm;
+	u_char *p = s;
+	ULONG chunk;
+
+	if (!s_init) {
+		s_init = 1;
+		if ((hm = LoadLibraryW(L"advapi32.dll")) != NULL)
+			s_pRtlGenRandom = (RtlGenRandomType)GetProcAddress(hm,
+			    "SystemFunction036");
+	}
+	if (s_pRtlGenRandom == NULL)
+		return -1;
+
+	while (len > 0) {
+		chunk = len > 1048576 ? 1048576 : (ULONG)len;
+		if (!s_pRtlGenRandom(p, chunk))
+			return -1;
+		p += chunk;
+		len -= chunk;
+	}
+	return 0;
+}
+
 static void
 w32_getentropy(void *s, size_t len)
 {
 	HCRYPTPROV provider = 0;
 	u_char *p = s;
 	DWORD chunk, error;
+
+	if (w32_rtlgenrandom(s, len) == 0)
+		return;
 
 	if (!CryptAcquireContext(&provider, NULL, NULL, PROV_RSA_FULL,
 	    CRYPT_VERIFYCONTEXT)) {
