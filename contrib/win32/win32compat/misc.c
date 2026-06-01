@@ -1084,6 +1084,25 @@ convertToForwardslash(char *str)
 	}
 }
 
+static const char *
+program_data_path_suffix(const char *path)
+{
+	size_t token_len;
+
+	if (path == NULL)
+		return NULL;
+
+	token_len = strlen(PROGRAM_DATA);
+	if (_strnicmp(path, PROGRAM_DATA, token_len) == 0)
+		return path + token_len;
+
+	token_len = strlen(PROGRAM_DATA_ENV);
+	if (_strnicmp(path, PROGRAM_DATA_ENV, token_len) == 0)
+		return path + token_len;
+
+	return NULL;
+}
+
 /*
  * This method will resolves references to /./, /../ and extra '/' characters in the null-terminated string named by
  *  path to produce a canonicalized absolute pathname.
@@ -1094,6 +1113,7 @@ realpath(const char *inputpath, char * resolved)
 	wchar_t* temppath_utf16 = NULL;
 	wchar_t* resolved_utf16 = NULL;
 	char path[PATH_MAX] = { 0, }, tempPath[PATH_MAX] = { 0, }, *ret = NULL;
+	const char *program_data_suffix = NULL;
 	int is_win_path = 1;
 
 	if (!inputpath || !resolved)
@@ -1111,9 +1131,9 @@ realpath(const char *inputpath, char * resolved)
 		is_win_path = 0;
 
 	if (is_win_path) {
-		if (_strnicmp(inputpath, PROGRAM_DATA, strlen(PROGRAM_DATA)) == 0) {
+		if ((program_data_suffix = program_data_path_suffix(inputpath)) != NULL) {
 			strcpy_s(path, PATH_MAX, __progdata);
-			strcat_s(path, PATH_MAX, &inputpath[strlen(PROGRAM_DATA)]);
+			strcat_s(path, PATH_MAX, program_data_suffix);
 		} else {
 			memcpy_s(path, PATH_MAX, inputpath, strlen(inputpath));
 		}
@@ -1540,7 +1560,7 @@ cleanup:
 	return ret;
 }
 
-/* Windows absolute paths - \abc, /abc, c:\abc, c:/abc, __PROGRAMDATA__\openssh\sshd_config */
+/* Windows absolute paths - \abc, /abc, c:\abc, c:/abc, __PROGRAMDATA__\openssh\sshd_config, %ProgramData%\openssh\sshd_config */
 int
 is_absolute_path(const char *path)
 {
@@ -1549,7 +1569,7 @@ is_absolute_path(const char *path)
 		path++;
 
 	if (*path == '/' || *path == '\\' || (*path != '\0' && __isascii(*path) && isalpha(*path) && path[1] == ':') ||
-	    ((strlen(path) >= strlen(PROGRAM_DATA)) && (memcmp(path, PROGRAM_DATA, strlen(PROGRAM_DATA)) == 0)))
+	    program_data_path_suffix(path) != NULL)
 		retVal = 1;
 
 	return retVal;

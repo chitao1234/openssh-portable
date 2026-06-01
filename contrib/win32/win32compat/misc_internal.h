@@ -21,6 +21,7 @@
 #define IS_VALID_HANDLE(h) (!IS_INVALID_HANDLE(h))
 #define PROGRAM_DATA "__PROGRAMDATA__"
 #define PROGRAM_DATAW L"__PROGRAMDATA__"
+#define PROGRAM_DATA_ENV "%ProgramData%"
 #define CYGWIN_PATH_PREFIX "/cygdrive/"
 
 #define errno_from_Win32LastError() errno_from_Win32Error(GetLastError())

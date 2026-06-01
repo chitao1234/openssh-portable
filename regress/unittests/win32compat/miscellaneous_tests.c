@@ -159,6 +159,8 @@ void test_realpath()
 	TEST_START("test realpath");
 
 	char resolved_path[PATH_MAX];
+	char expectedOutput3[PATH_MAX];
+	char expectedOutput4[PATH_MAX];
 	char *ret = NULL;
 	char *expectedOutput1 = "/c:/windows/system32";
 	char *expectedOutput2 = "/c:/";
@@ -210,6 +212,27 @@ void test_realpath()
 
 	ASSERT_PTR_NE(ret = realpath("\\", resolved_path), NULL);
 	ASSERT_STRING_EQ(ret, "/");
+
+	ASSERT_PTR_NE(__progdata, NULL);
+	ASSERT_INT_NE(__progdata[0], '\0');
+	_snprintf_s(expectedOutput3, _countof(expectedOutput3), _TRUNCATE,
+	    "/%s", __progdata);
+	convertToForwardslash(expectedOutput3);
+	_snprintf_s(expectedOutput4, _countof(expectedOutput4), _TRUNCATE,
+	    "%s/ssh", expectedOutput3);
+
+	ASSERT_INT_EQ(is_absolute_path("__PROGRAMDATA__\\ssh"), 1);
+	ASSERT_INT_EQ(is_absolute_path("%ProgramData%\\ssh"), 1);
+	ASSERT_INT_EQ(is_absolute_path("%PROGRAMDATA%\\ssh"), 1);
+
+	ASSERT_PTR_NE(ret = realpath("__PROGRAMDATA__\\ssh", resolved_path), NULL);
+	ASSERT_STRING_EQ(ret, expectedOutput4);
+
+	ASSERT_PTR_NE(ret = realpath("%ProgramData%\\ssh", resolved_path), NULL);
+	ASSERT_STRING_EQ(ret, expectedOutput4);
+
+	ASSERT_PTR_NE(ret = realpath("%PROGRAMDATA%/ssh", resolved_path), NULL);
+	ASSERT_STRING_EQ(ret, expectedOutput4);
 
 
 	TEST_DONE();
