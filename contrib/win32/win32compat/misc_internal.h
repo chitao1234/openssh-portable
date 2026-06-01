@@ -1,5 +1,6 @@
 #pragma once
 
+#include "sys/types.h"
 #include "w32api_proxies.h"
 #include "win32_path_max.h"
 
@@ -78,7 +79,7 @@ PSID lookup_sid(const wchar_t* name_utf16, PSID psid, DWORD * psid_len);
 PSID get_sid(const char*);
 int am_system();
 int is_conpty_supported();
-int exec_command_with_pty(int * pid, char* cmd, int in, int out, int err, unsigned int col, unsigned int row, int ttyfd);
+int exec_command_with_pty(pid_t * pid, char* cmd, int in, int out, int err, unsigned int col, unsigned int row, int ttyfd);
 char * build_exec_command(const char * command);
 char * build_commandline_string(const char* cmd, char *const argv[], BOOLEAN prepend_module_path);
 char* get_custom_lsa_package();

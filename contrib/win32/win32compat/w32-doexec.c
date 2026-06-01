@@ -33,6 +33,7 @@
 #include "channels.h"
 #include "hostfile.h"
 #include "auth.h"
+#include "session.h"
 #include "log.h"
 #include "misc.h"
 #include "servconf.h"

@@ -69,6 +69,7 @@ void	 do_cleanup(struct ssh *, Authctxt *);
 int	 session_open(Authctxt *, int);
 void	 session_unused(int);
 int	 session_input_channel_req(struct ssh *, Channel *, const char *);
+void	 session_set_fds(struct ssh *, Session *, int, int, int, int, int);
 void	 session_close_by_pid(struct ssh *ssh, pid_t, int);
 void	 session_close_by_channel(struct ssh *, int, int, void *);
 void	 session_destroy_all(struct ssh *, void (*)(Session *));

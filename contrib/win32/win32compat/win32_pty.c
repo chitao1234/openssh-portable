@@ -67,7 +67,7 @@ done:
 	return isConpty;
 }
 
-int exec_command_with_pty(int * pid, char* cmd, int in, int out, int err, unsigned int col, unsigned int row, int ttyfd)
+int exec_command_with_pty(pid_t * pid, char* cmd, int in, int out, int err, unsigned int col, unsigned int row, int ttyfd)
 {
 	PROCESS_INFORMATION pi;
 	STARTUPINFOW si;
