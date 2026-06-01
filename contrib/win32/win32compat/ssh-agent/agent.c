@@ -34,6 +34,7 @@
 #include <sddl.h>
 #include <userenv.h>
 #include "../misc_internal.h"
+#include "w32api_proxies.h"
 #include <pwd.h>
 #include "sshbuf.h"
 #include "sshkey.h"
@@ -160,7 +161,7 @@ agent_listen_loop()
 			HANDLE con = listener_pipe;
 			DWORD client_pid = 0;
 			listener_pipe = INVALID_HANDLE_VALUE;
-			GetNamedPipeClientProcessId(con, &client_pid);
+			pGetNamedPipeClientProcessId(con, &client_pid);
 			verbose("client pid %d connected", client_pid);
 			if (debug_mode) {
 				agent_process_connection(con);
@@ -294,31 +295,76 @@ con_type_to_string(struct agent_connection* con)
 }
 
 static int
+get_client_tokens(struct agent_connection* con, HANDLE *client_process_handle,
+	HANDLE *client_primary_token, HANDLE *client_impersonation_token)
+{
+	ULONG client_pid;
+
+	*client_process_handle = NULL;
+	*client_primary_token = NULL;
+	*client_impersonation_token = NULL;
+
+	if (pGetNamedPipeClientProcessId(con->pipe_handle, &client_pid) &&
+	    (*client_process_handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_DUP_HANDLE, FALSE, client_pid)) != NULL &&
+	    OpenProcessToken(*client_process_handle, TOKEN_QUERY | TOKEN_DUPLICATE, client_primary_token) &&
+	    DuplicateToken(*client_primary_token, SecurityImpersonation, client_impersonation_token))
+		return 0;
+
+	if (*client_primary_token != NULL) {
+		CloseHandle(*client_primary_token);
+		*client_primary_token = NULL;
+	}
+	if (*client_process_handle != NULL) {
+		CloseHandle(*client_process_handle);
+		*client_process_handle = NULL;
+	}
+
+	if (!ImpersonateNamedPipeClient(con->pipe_handle))
+		return -1;
+	if (!OpenThreadToken(GetCurrentThread(), TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_IMPERSONATE,
+	    TRUE, client_impersonation_token)) {
+		RevertToSelf();
+		return -1;
+	}
+	if (!RevertToSelf()) {
+		CloseHandle(*client_impersonation_token);
+		*client_impersonation_token = NULL;
+		return -1;
+	}
+
+	if (!DuplicateTokenEx(*client_impersonation_token, TOKEN_QUERY | TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE,
+	    NULL, SecurityImpersonation, TokenPrimary, client_primary_token)) {
+		debug("unable to duplicate client primary token, ERROR:%d", GetLastError());
+		*client_primary_token = NULL;
+	}
+
+	return 0;
+}
+
+static int
 get_con_client_info(struct agent_connection* con)
 {
 	int r = -1;
 	char sid[SECURITY_MAX_SID_SIZE];
-	ULONG client_pid;
 	DWORD reg_dom_len = 0, info_len = 0, sid_size;
 	DWORD sshd_sid_len = 0;
 	PSID sshd_sid = NULL;
 	HANDLE client_primary_token = NULL, client_impersonation_token = NULL, client_process_handle = NULL;
 	TOKEN_USER* info = NULL;
 	BOOL isMember = FALSE;
+	HANDLE token_for_info = NULL;
 
-	if (GetNamedPipeClientProcessId(con->pipe_handle, &client_pid) == FALSE ||
-		(client_process_handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL ||
-		OpenProcessToken(client_process_handle, TOKEN_QUERY | TOKEN_DUPLICATE, &client_primary_token) == FALSE ||
-		DuplicateToken(client_primary_token, SecurityImpersonation, &client_impersonation_token) == FALSE) {
+	if (get_client_tokens(con, &client_process_handle, &client_primary_token, &client_impersonation_token) != 0) {
 		error("cannot retrieve client impersonation token");
 		goto done;
 	}
+	token_for_info = client_primary_token != NULL ? client_primary_token : client_impersonation_token;
 
-	if (GetTokenInformation(client_primary_token, TokenUser, NULL, 0, &info_len) == TRUE ||
+	if (GetTokenInformation(token_for_info, TokenUser, NULL, 0, &info_len) == TRUE ||
 		(info = (TOKEN_USER*)malloc(info_len)) == NULL) // CodeQL [SM02320]: GetTokenInformation will initialize info
 		goto done;
 
-	if (GetTokenInformation(client_primary_token, TokenUser, info, info_len, &info_len) == FALSE)
+	if (GetTokenInformation(token_for_info, TokenUser, info, info_len, &info_len) == FALSE)
 		goto done;
 	
 	/* check if its localsystem */
@@ -337,7 +383,8 @@ get_con_client_info(struct agent_connection* con)
 	}
 
 	// Get client primary token
-	if (DuplicateTokenEx(client_primary_token, TOKEN_QUERY | TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE, NULL, SecurityImpersonation, TokenPrimary, &sshagent_client_primary_token) == FALSE) {
+	if (client_primary_token != NULL &&
+	    DuplicateTokenEx(client_primary_token, TOKEN_QUERY | TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE, NULL, SecurityImpersonation, TokenPrimary, &sshagent_client_primary_token) == FALSE) {
 		error_f("Failed to duplicate the primary token. error:%d", GetLastError());
 	}
 

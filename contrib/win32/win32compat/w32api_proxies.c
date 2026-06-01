@@ -441,6 +441,27 @@ pGetConsoleScreenBufferInfoEx(HANDLE handle, PCONSOLE_SCREEN_BUFFER_INFOEX conso
 	return TRUE;
 }
 
+BOOL
+pGetNamedPipeClientProcessId(HANDLE pipe, PULONG client_process_id)
+{
+	typedef BOOL (WINAPI *GetNamedPipeClientProcessIdType)(HANDLE, PULONG);
+	static GetNamedPipeClientProcessIdType s_pGetNamedPipeClientProcessId = NULL;
+	static int s_init = 0;
+	HMODULE hm = NULL;
+
+	if (!s_init) {
+		s_init = 1;
+		if ((hm = load_kernel32()) != NULL)
+			s_pGetNamedPipeClientProcessId = (GetNamedPipeClientProcessIdType)get_proc_address(hm, "GetNamedPipeClientProcessId");
+	}
+
+	if (s_pGetNamedPipeClientProcessId != NULL)
+		return s_pGetNamedPipeClientProcessId(pipe, client_process_id);
+
+	SetLastError(ERROR_CALL_NOT_IMPLEMENTED);
+	return FALSE;
+}
+
 ULONGLONG
 pGetTickCount64(void)
 {

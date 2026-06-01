@@ -28,6 +28,7 @@ BOOL pCancelSynchronousIo(HANDLE);
 BOOLEAN pCreateSymbolicLinkW(LPCWSTR, LPCWSTR, DWORD);
 DWORD pGetFinalPathNameByHandleW(HANDLE, LPWSTR, DWORD, DWORD);
 BOOL pGetConsoleScreenBufferInfoEx(HANDLE, PCONSOLE_SCREEN_BUFFER_INFOEX);
+BOOL pGetNamedPipeClientProcessId(HANDLE, PULONG);
 ULONGLONG pGetTickCount64(void);
 BOOL pIsWindowsVistaOrGreater(void);
 BOOL pIsWindows8OrGreater(void);
