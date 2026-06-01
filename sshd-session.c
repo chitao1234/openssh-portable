@@ -439,7 +439,8 @@ static void
 recv_autxctx_state(Authctxt *auth, int fd)
 {
 	struct sshbuf *m;
-	u_char *cp, ver, *user;
+	u_char ver;
+	const u_char *user;
 	size_t user_len;
 	int r;
 
@@ -455,7 +456,7 @@ recv_autxctx_state(Authctxt *auth, int fd)
 		fatal("%s: rexec version mismatch", __func__);
 	if ((r = sshbuf_get_string_direct(m, &user, &user_len)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	auth->user = xstrdup(user);
+	auth->user = xstrdup((const char *)user);
 
 	debug3("%s: done", __func__);
 	sshbuf_free(m);

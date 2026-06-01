@@ -1872,7 +1872,8 @@ monitor_send_keystate(struct monitor *pmonitor) {
 void
 monitor_recv_keystate(struct monitor*pmonitor) {
 	struct sshbuf *m;
-	u_char *cp, ver;
+	u_char ver;
+	const u_char *cp;
 	size_t len;
 	int r;
 
@@ -2201,5 +2202,4 @@ mm_answer_gss_userok(struct ssh *ssh, int sock, struct sshbuf *m)
 	return (authenticated);
 }
 #endif /* GSSAPI */
-
 
