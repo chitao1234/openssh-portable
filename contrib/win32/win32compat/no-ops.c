@@ -61,7 +61,7 @@ permanently_set_uid(struct passwd *pw)
 int
 innetgr(const char *netgroup, const char *host, const char *user, const char *domain)
 {
-	return -1;
+	return 0;
 }
 
 

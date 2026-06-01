@@ -34,7 +34,7 @@ int setenv(const char *, const char *, int);
 int setlogin(const char *);
 #endif /* !HAVE_SETLOGIN */
 
-#ifndef HAVE_INNETGR
+#if !defined(HAVE_INNETGR) || defined(WINDOWS)
 int innetgr(const char *, const char *, const char *, const char *);
 #endif /* HAVE_INNETGR */
 
