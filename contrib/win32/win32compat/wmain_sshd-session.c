@@ -49,6 +49,43 @@
 int main(int, char **);
 extern HANDLE main_thread;
 
+#define SSHD_SESSION_DEBUG_WAIT_ENV		"OPENSSH_SSHD_SESSION_DEBUG_WAIT"
+#define SSHD_SESSION_DEBUG_WAIT_DEFAULT		60
+#define SSHD_SESSION_DEBUG_WAIT_MAX		3600
+
+static void
+sshd_session_debug_wait(int argc, wchar_t **wargv)
+{
+	const char *value = getenv(SSHD_SESSION_DEBUG_WAIT_ENV);
+	char *endp = NULL;
+	unsigned long seconds;
+	int i, rexec = 0;
+
+	if (value == NULL || *value == '\0')
+		return;
+
+	for (i = 1; i < argc; i++) {
+		if (wcscmp(wargv[i], L"-R") == 0) {
+			rexec = 1;
+			break;
+		}
+	}
+	if (!rexec)
+		return;
+
+	seconds = strtoul(value, &endp, 10);
+	if (endp == value || *endp != '\0' || seconds == 0 ||
+	    seconds > SSHD_SESSION_DEBUG_WAIT_MAX)
+		seconds = SSHD_SESSION_DEBUG_WAIT_DEFAULT;
+
+	fprintf(stderr, "sshd-session -R debug wait: pid %lu, waiting %lu "
+	    "seconds for debugger attach (%s=%s)\n",
+	    (unsigned long)GetCurrentProcessId(), seconds,
+	    SSHD_SESSION_DEBUG_WAIT_ENV, value);
+	fflush(stderr);
+	Sleep((DWORD)seconds * 1000);
+}
+
 int sshd_session_main(int argc, wchar_t **wargv) {
 	char** argv = NULL;
 	int i, r;
@@ -78,6 +115,8 @@ int wmain(int argc, wchar_t **wargv) {
 	size_t path_new_len = 0, len;
 	argc_original = argc;
 	wargv_original = wargv;
+
+	sshd_session_debug_wait(argc, wargv);
 
 	init_prog_paths();
 	/* change current directory to sshd-session.exe root */

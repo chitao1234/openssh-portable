@@ -77,32 +77,6 @@
 #include "sshTelemetry.h"
 #endif
 
-#ifdef WINDOWS
-#define SSHD_DEBUG_WAIT_ENV		"OPENSSH_SSHD_DEBUG_WAIT"
-#define SSHD_DEBUG_WAIT_DEFAULT		60
-#define SSHD_DEBUG_WAIT_MAX		3600
-
-static void
-windows_debug_wait(const char *where)
-{
-	const char *errstr = NULL, *value;
-	int seconds;
-
-	if ((value = getenv(SSHD_DEBUG_WAIT_ENV)) == NULL || *value == '\0')
-		return;
-
-	seconds = (int)strtonum(value, 1, SSHD_DEBUG_WAIT_MAX, &errstr);
-	if (errstr != NULL)
-		seconds = SSHD_DEBUG_WAIT_DEFAULT;
-
-	fprintf(stderr, "sshd debug wait at %s: pid %ld, waiting %d "
-	    "seconds for debugger attach (%s=%s)\n", where, (long)getpid(),
-	    seconds, SSHD_DEBUG_WAIT_ENV, value);
-	fflush(stderr);
-	(void)usleep((unsigned int)seconds * 1000000);
-}
-#endif /* WINDOWS */
-
 #include "xmalloc.h"
 #include "ssh.h"
 #include "sshpty.h"
@@ -1898,10 +1872,6 @@ main(int ac, char **av)
 	}
 	/* Reinitialize the log (because of the fork above). */
 	log_init(__progname, options.log_level, options.log_facility, log_stderr);
-
-#ifdef WINDOWS
-	windows_debug_wait("before listen");
-#endif /* WINDOWS */
 
 	/*
 	 * Chdir to the root directory so that the current disk can be
