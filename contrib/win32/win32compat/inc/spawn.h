@@ -39,6 +39,9 @@ int
 posix_spawn_as_user(pid_t *pidp, const char *path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[], void *user_token);
 
 int
+__posix_spawn_asuser(pid_t *pidp, const char *path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[], char *user);
+
+int
 posix_spawnp(pid_t *pidp, const char *file, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[]);
 
 int
@@ -74,6 +77,5 @@ posix_spawnattr_setflags(posix_spawnattr_t *attr, short flags);
 int posix_spawnattr_getpgroup(const posix_spawnattr_t * attr, pid_t * pgroup);
 
 int posix_spawnattr_setpgroup(posix_spawnattr_t *attr, pid_t pgroup);
-
 
 

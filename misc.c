@@ -79,6 +79,7 @@
 #include "ssherr.h"
 #include "platform.h"
 #ifdef WINDOWS
+# include "misc_internal.h"
 # include "sshfileperm.h"
 #endif
 

@@ -174,6 +174,7 @@ fd_table_initialize()
 			fd_decode_state(posix_fd_state);
 			free(posix_fd_state);
 			_putenv_s(POSIX_FD_STATE, "");
+			SetEnvironmentVariableA(POSIX_FD_STATE, NULL);
 		}
 	}
 
@@ -999,14 +1000,36 @@ dup_handle(int fd)
 		SOCKET sock = (SOCKET)h;
 		WSAPROTOCOL_INFOW info;
 		if (WSADuplicateSocketW(sock, GetCurrentProcessId(), &info) != 0) {
+			int wsa_error = WSAGetLastError();
+			HANDLE dup_handle;
+
+			if (DuplicateHandle(GetCurrentProcess(), h,
+			    GetCurrentProcess(), &dup_handle, 0, TRUE,
+			    DUPLICATE_SAME_ACCESS))
+				return dup_handle;
+			DWORD win32_error = GetLastError();
+
 			errno = EOTHER;
-			error("WSADuplicateSocket failed, WSALastError: %d", WSAGetLastError());
+			error("WSADuplicateSocket failed, WSALastError: %d",
+			    wsa_error);
+			error("dup - ERROR: DuplicateHandle() :%d",
+			    win32_error);
 			return NULL;
 		} 
 		dup_sock = WSASocketW(FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, &info, 0, 0);
 		if (dup_sock == INVALID_SOCKET) {
 			errno = EOTHER;
 			error("WSASocketW failed, WSALastError: %d", WSAGetLastError());
+			return NULL;
+		}
+		if (SetHandleInformation((HANDLE)dup_sock, HANDLE_FLAG_INHERIT,
+		    HANDLE_FLAG_INHERIT) == FALSE) {
+			DWORD win32_error = GetLastError();
+
+			errno = errno_from_Win32Error(win32_error);
+			error("SetHandleInformation failed, error:%d",
+			    win32_error);
+			closesocket(dup_sock);
 			return NULL;
 		}
 		return (HANDLE)dup_sock;
@@ -1268,14 +1291,13 @@ cleanup:
 /* structures defining binary layout of fd info to be transmitted between parent and child processes*/
 struct std_fd_state {
 	int num_inherited;
-	char in_type;
-	char out_type;
-	char err_type;
+	intptr_t stdio_handle[STDERR_FILENO + 1];
+	char stdio_type[STDERR_FILENO + 1];
 	char padding;
 };
 
 struct inh_fd_state {
-	int handle;
+	intptr_t handle;
 	short index;
 	char type;
 	char padding;
@@ -1284,11 +1306,13 @@ struct inh_fd_state {
 
 /* encodes the fd info into a base64 encoded binary blob */
 static char*
-fd_encode_state(const posix_spawn_file_actions_t *file_actions, HANDLE aux_h[])
+fd_encode_state(const posix_spawn_file_actions_t *file_actions,
+    HANDLE stdio_h[], HANDLE aux_h[])
 {
 	char *buf, *encoded;
 	struct std_fd_state *std_fd_state;
 	struct inh_fd_state *c;
+	DWORD state_len;
 	DWORD len_req = 0;
 	BOOL b;
 	int i;
@@ -1299,7 +1323,9 @@ fd_encode_state(const posix_spawn_file_actions_t *file_actions, HANDLE aux_h[])
 	const int *parent_aux_fds = file_actions->aux_fds_info.parent_fd;
 	const int *child_aux_fds = file_actions->aux_fds_info.child_fd;
 
-	buf = malloc(8 * (1 + num_aux_fds));
+	state_len = sizeof(struct std_fd_state) +
+	    num_aux_fds * sizeof(struct inh_fd_state);
+	buf = calloc(1, state_len);
 	if (!buf) {
 		errno = ENOMEM;
 		return NULL;
@@ -1307,26 +1333,48 @@ fd_encode_state(const posix_spawn_file_actions_t *file_actions, HANDLE aux_h[])
 
 	std_fd_state = (struct std_fd_state *)buf;
 	std_fd_state->num_inherited = num_aux_fds;
-	std_fd_state->in_type = fd_table.w32_ios[fd_in]->type;
-	std_fd_state->out_type = fd_table.w32_ios[fd_out]->type;
-	std_fd_state->err_type = fd_table.w32_ios[fd_err]->type;
+	std_fd_state->stdio_handle[STDIN_FILENO] =
+	    (intptr_t)stdio_h[STDIN_FILENO];
+	std_fd_state->stdio_handle[STDOUT_FILENO] =
+	    (intptr_t)stdio_h[STDOUT_FILENO];
+	std_fd_state->stdio_handle[STDERR_FILENO] =
+	    (intptr_t)stdio_h[STDERR_FILENO];
+	std_fd_state->stdio_type[STDIN_FILENO] =
+	    fd_table.w32_ios[fd_in]->type;
+	std_fd_state->stdio_type[STDOUT_FILENO] =
+	    fd_table.w32_ios[fd_out]->type;
+	std_fd_state->stdio_type[STDERR_FILENO] =
+	    fd_table.w32_ios[fd_err]->type;
 
-	c = (struct inh_fd_state*)(buf + 8);
+	c = (struct inh_fd_state*)(buf + sizeof(struct std_fd_state));
 	for (i = 0; i < num_aux_fds; i++) {
-		c->handle = (int)(intptr_t)aux_h[i];
+		c->handle = (intptr_t)aux_h[i];
 		c->index = child_aux_fds[i];
 		c->type = fd_table.w32_ios[parent_aux_fds[i]]->type;
 		c++;
 	}
 
-	b = CryptBinaryToStringA(buf, 8 * (1 + num_aux_fds), CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, NULL, &len_req);
+	b = CryptBinaryToStringA(buf, state_len,
+	    CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, NULL, &len_req);
+	if (!b) {
+		free(buf);
+		errno = errno_from_Win32LastError();
+		return NULL;
+	}
 	encoded = malloc(len_req);
 	if (!encoded) {
 		free(buf);
 		errno = ENOMEM;
 		return NULL;
 	}
-	b = CryptBinaryToStringA(buf, 8 * (1 + num_aux_fds), CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, encoded, &len_req);
+	b = CryptBinaryToStringA(buf, state_len,
+	    CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, encoded, &len_req);
+	if (!b) {
+		free(buf);
+		free(encoded);
+		errno = errno_from_Win32LastError();
+		return NULL;
+	}
 
 	free(buf);
 	return encoded;
@@ -1341,27 +1389,45 @@ fd_decode_state(char* enc_buf)
 	struct std_fd_state *std_fd_state;
 	struct inh_fd_state *c;
 	int num_inherited = 0;
+	int fd;
 
-	CryptStringToBinary(enc_buf, 0, CRYPT_STRING_BASE64 | CRYPT_STRING_STRICT, NULL, &req, &skipped, &out_flags);
+	if (!CryptStringToBinaryA(enc_buf, 0, CRYPT_STRING_BASE64, NULL, &req,
+	    &skipped, &out_flags))
+		fatal("failed to decode POSIX fd state: %d", GetLastError());
+	if (req < sizeof(struct std_fd_state))
+		fatal("invalid POSIX fd state");
 	buf = malloc(req);
 	if (!buf) 
 		fatal("out of memory");
 
-	CryptStringToBinary(enc_buf, 0, CRYPT_STRING_BASE64 | CRYPT_STRING_STRICT, buf, &req, &skipped, &out_flags);
+	if (!CryptStringToBinaryA(enc_buf, 0, CRYPT_STRING_BASE64, buf, &req,
+	    &skipped, &out_flags))
+		fatal("failed to decode POSIX fd state: %d", GetLastError());
 
 	std_fd_state = (struct std_fd_state *)buf;
-	fd_table.w32_ios[0]->type = std_fd_state->in_type;
-	if (fd_table.w32_ios[0]->type == SOCK_FD)
-		fd_table.w32_ios[0]->internal.state = SOCK_READY;
-	fd_table.w32_ios[1]->type = std_fd_state->out_type;
-	if (fd_table.w32_ios[1]->type == SOCK_FD)
-		fd_table.w32_ios[1]->internal.state = SOCK_READY;
-	fd_table.w32_ios[2]->type = std_fd_state->err_type;
-	if (fd_table.w32_ios[2]->type == SOCK_FD)
-		fd_table.w32_ios[2]->internal.state = SOCK_READY;
-	num_inherited = std_fd_state->num_inherited;
+	for (fd = STDIN_FILENO; fd <= STDERR_FILENO; fd++) {
+		struct w32_io *pio = fd_table.w32_ios[fd];
 
-	c = (struct inh_fd_state*)(buf + 8);
+		if (pio == NULL) {
+			pio = malloc(sizeof(*pio));
+			if (pio == NULL)
+				fatal("out of memory");
+			ZeroMemory(pio, sizeof(*pio));
+		}
+		pio->handle = (void *)std_fd_state->stdio_handle[fd];
+		pio->type = std_fd_state->stdio_type[fd];
+		if (pio->type == SOCK_FD)
+			pio->internal.state = SOCK_READY;
+		if (fd_table.w32_ios[fd] == NULL)
+			fd_table_set(pio, fd);
+	}
+	num_inherited = std_fd_state->num_inherited;
+	if (num_inherited < 0 || num_inherited > MAX_INHERITED_FDS ||
+	    req < sizeof(struct std_fd_state) +
+	    (DWORD)num_inherited * sizeof(struct inh_fd_state))
+		fatal("invalid POSIX inherited fd state");
+
+	c = (struct inh_fd_state*)(buf + sizeof(struct std_fd_state));
 	while (num_inherited--) {
 		struct w32_io* pio = malloc(sizeof(struct w32_io));
 		if (!pio)
@@ -1411,11 +1477,16 @@ posix_spawn_internal(pid_t *pidp, const char *path, const posix_spawn_file_actio
 	}
 
 	/* set fd info */
-	if ((fd_info = fd_encode_state(file_actions, aux_handles)) == NULL)
+	if ((fd_info = fd_encode_state(file_actions, stdio_handles,
+	    aux_handles)) == NULL)
 		goto cleanup;
 
 	if (_putenv_s(POSIX_FD_STATE, fd_info) != 0)
 		goto cleanup;
+	if (SetEnvironmentVariableA(POSIX_FD_STATE, fd_info) == FALSE) {
+		errno = errno_from_Win32LastError();
+		goto cleanup;
+	}
 	i = spawn_child_internal(path, argv + 1, stdio_handles[STDIN_FILENO], stdio_handles[STDOUT_FILENO], stdio_handles[STDERR_FILENO], sc_flags, user_token, prepend_module_path);
 	if (i == -1)
 		goto cleanup;
@@ -1424,6 +1495,7 @@ posix_spawn_internal(pid_t *pidp, const char *path, const posix_spawn_file_actio
 	ret = 0;
 cleanup:
 	_putenv_s(POSIX_FD_STATE, "");
+	SetEnvironmentVariableA(POSIX_FD_STATE, NULL);
 	for (i = 0; i <= STDERR_FILENO; i++) {
 		if (stdio_handles[i] != NULL) {
 			if (fd_table.w32_ios[file_actions->stdio_redirect[i]]->type == SOCK_FD)

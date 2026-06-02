@@ -156,6 +156,9 @@
 /* File names may not contain backslash characters */
 #undef FILESYSTEM_NO_BACKSLASH
 
+/* Define if the platform cannot fork */
+#undef FORK_NOT_SUPPORTED
+
 /* fsid_t has member val */
 #undef FSID_HAS_VAL
 

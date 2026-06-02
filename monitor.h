@@ -87,8 +87,12 @@ struct Authctxt;
 void monitor_child_preauth(struct ssh *, struct monitor *);
 void monitor_child_postauth(struct ssh *, struct monitor *);
 
+void monitor_send_keystate(struct monitor *);
+void monitor_recv_keystate(struct monitor *);
 void monitor_clear_keystate(struct ssh *, struct monitor *);
 void monitor_apply_keystate(struct ssh *, struct monitor *);
+void monitor_send_authopt(struct monitor *, int);
+void monitor_recv_authopt(struct monitor *);
 
 /* Prototypes for request sending and receiving */
 void mm_request_send(int, enum monitor_reqtype, struct sshbuf *);

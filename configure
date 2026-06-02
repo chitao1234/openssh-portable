@@ -5876,6 +5876,9 @@ case "$host" in
 	# Match the Visual Studio Win32 config instead of probing the build host
 	# or treating public wrapper redirects as native platform features.
 
+printf "%s\n" "#define FORK_NOT_SUPPORTED 1" >>confdefs.h
+
+
 printf "%s\n" "#define WIN32_LEAN_AND_MEAN 1" >>confdefs.h
 
 

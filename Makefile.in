@@ -183,6 +183,9 @@ LIBSSH_OBJS=${LIBOPENSSH_OBJS} \
 	sftp-realpath.o platform-pledge.o platform-tracing.o platform-misc.o \
 	sshbuf-io.o \
 	$(WIN32_TTY_OBJS)
+ifneq ($(WIN32COMPATLIB),)
+LIBSSH_OBJS += spawn-ext.o
+endif
 
 SKOBJS=	ssh-sk-client.o
 
@@ -334,6 +337,9 @@ wmain_sshd-session.o: $(srcdir)/contrib/win32/win32compat/wmain_sshd-session.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
 wmain_sshd-auth.o: $(srcdir)/contrib/win32/win32compat/wmain_sshd-auth.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+spawn-ext.o: $(srcdir)/contrib/win32/win32compat/spawn-ext.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
 shell-host.o: $(srcdir)/contrib/win32/win32compat/shell-host.c

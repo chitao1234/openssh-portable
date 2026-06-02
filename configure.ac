@@ -132,6 +132,7 @@ case "$host" in
 
 	# Match the Visual Studio Win32 config instead of probing the build host
 	# or treating public wrapper redirects as native platform features.
+	AC_DEFINE([FORK_NOT_SUPPORTED], [1], [Define if the platform cannot fork])
 	AC_DEFINE([WIN32_LEAN_AND_MEAN], [1], [Define to exclude rarely-used Windows headers])
 	AC_DEFINE([SUPPORT_CRLF], [1], [Define to support CRLF line endings])
 	AC_DEFINE([BROKEN_READV_COMPARISON], [1], [Can't do comparisons on readv])
