@@ -43,6 +43,7 @@
 #include <windows.h>
 #include <process.h>
 #include <stdlib.h>
+#include <string.h>
 #include "w32fd.h"
 #include "tncon.h"
 #include "utf.h"
@@ -218,19 +219,40 @@ WriteThread(_In_ LPVOID lpParameter)
 	debug5("WriteThread thread, io:%p", pio);
 
 	if (FILETYPE(pio) == FILE_TYPE_CHAR) {
-		pio->write_details.buf[pio->sync_write_status.to_transfer] = '\0';
 		if (0 == in_raw_mode) {
-			wchar_t* t = utf8_to_utf16(pio->write_details.buf);
-			if (t != NULL)
-			{
-				WriteConsoleW(WINHANDLE(pio), t, (DWORD)wcslen(t), 0, 0);
-				free(t);
+			char *utf8 = pio->write_details.buf, *alloc = NULL;
+			wchar_t *t;
+			DWORD written;
+
+			if (pio->sync_write_status.to_transfer <
+			    pio->write_details.buf_size) {
+				utf8[pio->sync_write_status.to_transfer] = '\0';
+			} else if ((alloc = malloc(
+			    pio->sync_write_status.to_transfer + 1)) == NULL) {
+				pio->sync_write_status.error = ERROR_OUTOFMEMORY;
+				goto done;
+			} else {
+				memcpy(alloc, pio->write_details.buf,
+				    pio->sync_write_status.to_transfer);
+				alloc[pio->sync_write_status.to_transfer] = '\0';
+				utf8 = alloc;
 			}
+
+			t = utf8_to_utf16(utf8);
+			if (t != NULL) {
+				if (!WriteConsoleW(WINHANDLE(pio), t,
+				    (DWORD)wcslen(t), &written, NULL))
+					pio->sync_write_status.error = GetLastError();
+				free(t);
+			} else
+				pio->sync_write_status.error = ERROR_OUTOFMEMORY;
+			free(alloc);
 		} else {
 			processBuffer(WINHANDLE(pio), pio->write_details.buf, pio->sync_write_status.to_transfer, &respbuf, &resplen);
 			/* TODO - respbuf is not null in some cases, this needs to be returned back via read stream */
 		}
-		pio->sync_write_status.transferred = pio->sync_write_status.to_transfer;
+		if (pio->sync_write_status.error == 0)
+			pio->sync_write_status.transferred = pio->sync_write_status.to_transfer;
 	} else {
 		if (!WriteFile(WINHANDLE(pio), pio->write_details.buf, pio->sync_write_status.to_transfer,
 		    &(pio->sync_write_status.transferred), NULL)) {
@@ -239,7 +261,7 @@ WriteThread(_In_ LPVOID lpParameter)
 		}
 	}
 
-	
+done:
 	if (0 == QueueUserAPC(WriteAPCProc, main_thread, (ULONG_PTR)pio)) {
 		error("WriteThread thread - ERROR QueueUserAPC failed %d, io:%p", GetLastError(), pio);
 		pio->write_details.pending = FALSE;
