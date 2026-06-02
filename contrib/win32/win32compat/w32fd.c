@@ -1016,7 +1016,13 @@ dup_handle(int fd)
 			    win32_error);
 			return NULL;
 		} 
-		dup_sock = WSASocketW(FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, &info, 0, 0);
+		/*
+		 * socketio_send/socketio_recv always use overlapped Winsock
+		 * operations. Preserve that capability when dup() recreates a
+		 * socket from WSADuplicateSocket protocol info.
+		 */
+		dup_sock = WSASocketW(FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO,
+		    FROM_PROTOCOL_INFO, &info, 0, WSA_FLAG_OVERLAPPED);
 		if (dup_sock == INVALID_SOCKET) {
 			errno = EOTHER;
 			error("WSASocketW failed, WSALastError: %d", WSAGetLastError());
