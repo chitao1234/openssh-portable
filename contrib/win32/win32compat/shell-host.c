@@ -804,7 +804,8 @@ SizeWindow(HANDLE hInput)
 	matchingFont.FontWeight = FW_NORMAL;	
 	wcscpy_s(matchingFont.FaceName, LF_FACESIZE, L"Consolas");
 
-	bSuccess = __SetCurrentConsoleFontEx(hInput, FALSE, &matchingFont);
+	if (__SetCurrentConsoleFontEx != NULL)
+		bSuccess = __SetCurrentConsoleFontEx(hInput, FALSE, &matchingFont);
 
 	/* This information is the live screen  */
 	ZeroMemory(&consoleInfo, sizeof(consoleInfo));
@@ -1324,12 +1325,13 @@ start_with_pty(wchar_t *command)
 
 	if ((hm_kernel32 = LoadLibraryW(kernel32_dll_path)) == NULL ||
 	    (hm_user32 = LoadLibraryW(user32_dll_path)) == NULL ||
-	    (__SetCurrentConsoleFontEx = (__t_SetCurrentConsoleFontEx)GetProcAddress(hm_kernel32, "SetCurrentConsoleFontEx")) == NULL ||
 	    (__UnhookWinEvent = (__t_UnhookWinEvent)GetProcAddress(hm_user32, "UnhookWinEvent")) == NULL ||
 	    (__SetWinEventHook = (__t_SetWinEventHook)GetProcAddress(hm_user32, "SetWinEventHook")) == NULL) {
 		printf_s("cannot support a pseudo terminal. \n");
 		return -1;
 	}
+	__SetCurrentConsoleFontEx = (__t_SetCurrentConsoleFontEx)
+	    GetProcAddress(hm_kernel32, "SetCurrentConsoleFontEx");
 
 	pipe_in = GetStdHandle(STD_INPUT_HANDLE);
 	pipe_out = GetStdHandle(STD_OUTPUT_HANDLE);
