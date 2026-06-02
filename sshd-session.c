@@ -691,18 +691,25 @@ privsep_preauth(struct ssh *ssh)
 	}
 	else { /* parent */
 		posix_spawn_file_actions_t actions;
+		int devnull;
 
+		/* Keep raw stderr on NUL; PRIVSEP_LOG_FD carries framed logs. */
+		if ((devnull = open(_PATH_DEVNULL, O_WRONLY)) == -1)
+			fatal("open %s: %s", _PATH_DEVNULL, strerror(errno));
 		if (posix_spawn_file_actions_init(&actions) != 0 ||
 		    posix_spawn_file_actions_adddup2(&actions, io_sock_in, STDIN_FILENO) != 0 ||
 		    posix_spawn_file_actions_adddup2(&actions, io_sock_out, STDOUT_FILENO) != 0 ||
+		    posix_spawn_file_actions_adddup2(&actions, devnull, STDERR_FILENO) != 0 ||
 		    posix_spawn_file_actions_adddup2(&actions, pmonitor->m_recvfd, PRIVSEP_MONITOR_FD) != 0 ||
 		    posix_spawn_file_actions_adddup2(&actions, pmonitor->m_log_sendfd, PRIVSEP_LOG_FD) != 0 )
 			fatal("posix_spawn initialization failed");
 
-		if (__posix_spawn_asuser(&pid, options.sshd_auth_path, &actions, NULL, saved_argv, NULL, SSH_PRIVSEP_USER) != 0)
-			fatal("%s, fork of unprivileged child failed", __func__);
-
+		r = __posix_spawn_asuser(&pid, options.sshd_auth_path, &actions,
+		    NULL, saved_argv, NULL, SSH_PRIVSEP_USER);
 		posix_spawn_file_actions_destroy(&actions);
+		close(devnull);
+		if (r != 0)
+			fatal("%s, fork of unprivileged child failed", __func__);
 
 		debug2("Network child is on pid %ld", (long)pid);
 
@@ -833,19 +840,26 @@ privsep_postauth(struct ssh *ssh, Authctxt *authctxt)
 #ifdef FORK_NOT_SUPPORTED
 	if (!privsep_auth_child) { /* parent */
 		posix_spawn_file_actions_t actions;
+		int devnull, r;
 
+		/* Keep raw stderr on NUL; PRIVSEP_LOG_FD carries framed logs. */
+		if ((devnull = open(_PATH_DEVNULL, O_WRONLY)) == -1)
+			fatal("open %s: %s", _PATH_DEVNULL, strerror(errno));
 		if (posix_spawn_file_actions_init(&actions) != 0 ||
 		    posix_spawn_file_actions_adddup2(&actions, io_sock_in, STDIN_FILENO) != 0 ||
 		    posix_spawn_file_actions_adddup2(&actions, io_sock_out, STDOUT_FILENO) != 0 ||
-			/*Allow authenticated child process to foward log messages to parent for processing*/
+		    posix_spawn_file_actions_adddup2(&actions, devnull, STDERR_FILENO) != 0 ||
 		    posix_spawn_file_actions_adddup2(&actions, pmonitor->m_log_sendfd, PRIVSEP_LOG_FD) != 0 ||
 		    posix_spawn_file_actions_adddup2(&actions, pmonitor->m_recvfd, PRIVSEP_MONITOR_FD) != 0)
 			fatal("posix_spawn initialization failed");
 
-		char** argv = privsep_child_cmdline();
-		if (__posix_spawn_asuser(&pmonitor->m_pid, argv[0], &actions, NULL, argv, NULL, authctxt->pw->pw_name) != 0)
-			fatal("fork of unprivileged child failed");
+		char **argv = privsep_child_cmdline();
+		r = __posix_spawn_asuser(&pmonitor->m_pid, argv[0], &actions,
+		    NULL, argv, NULL, authctxt->pw->pw_name);
 		posix_spawn_file_actions_destroy(&actions);
+		close(devnull);
+		if (r != 0)
+			fatal("fork of unprivileged child failed");
 
 		verbose("User child is on pid %ld", (long)pmonitor->m_pid);
 		send_config_state(pmonitor->m_sendfd, cfg);
