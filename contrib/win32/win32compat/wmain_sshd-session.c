@@ -52,6 +52,7 @@ extern HANDLE main_thread;
 #define SSHD_SESSION_DEBUG_WAIT_ENV		"OPENSSH_SSHD_SESSION_DEBUG_WAIT"
 #define SSHD_SESSION_DEBUG_WAIT_DEFAULT		60
 #define SSHD_SESSION_DEBUG_WAIT_MAX		3600
+#define SSHD_SESSION_DEBUG_WAIT_POLL_MS		100
 
 static void
 sshd_session_debug_wait(int argc, wchar_t **wargv)
@@ -59,6 +60,7 @@ sshd_session_debug_wait(int argc, wchar_t **wargv)
 	const char *value = getenv(SSHD_SESSION_DEBUG_WAIT_ENV);
 	char *endp = NULL;
 	unsigned long seconds;
+	DWORD timeout_ms, waited_ms = 0;
 	int i, rexec = 0;
 
 	if (value == NULL || *value == '\0')
@@ -78,12 +80,30 @@ sshd_session_debug_wait(int argc, wchar_t **wargv)
 	    seconds > SSHD_SESSION_DEBUG_WAIT_MAX)
 		seconds = SSHD_SESSION_DEBUG_WAIT_DEFAULT;
 
-	fprintf(stderr, "sshd-session -R debug wait: pid %lu, waiting %lu "
+	timeout_ms = (DWORD)seconds * 1000;
+	fprintf(stderr, "sshd-session -R debug wait: pid %lu, waiting up to %lu "
 	    "seconds for debugger attach (%s=%s)\n",
 	    (unsigned long)GetCurrentProcessId(), seconds,
 	    SSHD_SESSION_DEBUG_WAIT_ENV, value);
 	fflush(stderr);
-	Sleep((DWORD)seconds * 1000);
+
+	while (!IsDebuggerPresent() && waited_ms < timeout_ms) {
+		DWORD interval = timeout_ms - waited_ms;
+
+		if (interval > SSHD_SESSION_DEBUG_WAIT_POLL_MS)
+			interval = SSHD_SESSION_DEBUG_WAIT_POLL_MS;
+		Sleep(interval);
+		waited_ms += interval;
+	}
+
+	if (IsDebuggerPresent())
+		fprintf(stderr, "sshd-session -R debug wait: debugger "
+		    "attached after %lu ms; continuing\n",
+		    (unsigned long)waited_ms);
+	else
+		fprintf(stderr, "sshd-session -R debug wait: timed out; "
+		    "continuing\n");
+	fflush(stderr);
 }
 
 int sshd_session_main(int argc, wchar_t **wargv) {
