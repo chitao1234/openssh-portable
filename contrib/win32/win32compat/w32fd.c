@@ -1041,10 +1041,13 @@ dup_handle(int fd)
 		return (HANDLE)dup_sock;
 	}
 	else {
-		HANDLE dup_handle;
+		HANDLE dup_handle = NULL;
 		if (!DuplicateHandle(GetCurrentProcess(), h, GetCurrentProcess(), &dup_handle, 0, TRUE, DUPLICATE_SAME_ACCESS)) {
-			errno = EOTHER;
-			error("dup - ERROR: DuplicatedHandle() :%d", GetLastError());
+			DWORD win32_error = GetLastError();
+
+			errno = errno_from_Win32Error(win32_error);
+			error("dup - ERROR: DuplicateHandle() :%d", win32_error);
+			return NULL;
 		}
 		return dup_handle;
 	}
