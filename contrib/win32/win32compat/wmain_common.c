@@ -32,6 +32,7 @@
 
 #include <winsock2.h>
 #include <windows.h>
+#include <stdlib.h>
 #include "utf.h"
 #include "misc_internal.h"
 #include "Debug.h"

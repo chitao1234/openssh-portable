@@ -69,7 +69,7 @@ CC=@CC@
 LD=@LD@
 CFLAGS=@CFLAGS@
 CFLAGS_NOPIE=@CFLAGS_NOPIE@
-CPPFLAGS=-I. -I$(srcdir) @WIN32COMPAT_MAKE_CPPFLAGS@ @CPPFLAGS@ $(PATHS) @DEFS@
+CPPFLAGS=-I. -I$(srcdir) @WIN32COMPAT_MAKE_CPPFLAGS@ @WIN32COMPAT_CPPFLAGS@ @CPPFLAGS@ $(PATHS) @DEFS@
 PICFLAG=@PICFLAG@
 LIBS=@LIBS@
 CHANNELLIBS=@CHANNELLIBS@
@@ -112,6 +112,11 @@ endif
 WIN32_TTY_OBJS=
 ifneq ($(WIN32COMPATLIB),)
 WIN32_TTY_OBJS=win32_sshtty.o win32_sshpty.o ttymodes_windows.o
+endif
+
+LIBSSH_UTF8_OBJ=utf8.o
+ifneq ($(WIN32COMPATLIB),)
+LIBSSH_UTF8_OBJ=win32-utf8.o
 endif
 
 WIN32_WMAIN_COMMON_OBJ=
@@ -169,7 +174,7 @@ LIBSSH_OBJS=${LIBOPENSSH_OBJS} \
 	compat.o fatal.o hostfile.o \
 	log.o match.o moduli.o nchan.o packet.o \
 	readpass.o xmalloc.o addr.o addrmatch.o \
-	atomicio.o dispatch.o mac.o misc.o utf8.o \
+	atomicio.o dispatch.o mac.o misc.o $(LIBSSH_UTF8_OBJ) \
 	monitor_fdpass.o rijndael.o ssh-dss.o ssh-ecdsa.o ssh-ecdsa-sk.o \
 	ssh-ed25519-sk.o ssh-rsa.o dh.o \
 	msg.o progressmeter.o dns.o entropy.o gss-genr.o umac.o umac128.o \
@@ -196,7 +201,7 @@ SSHOBJS= ssh.o readconf.o clientloop.o \
 SSHDOBJS=sshd.o \
 	platform-listen.o \
 	servconf.o srclimit.o $(GROUPACCESS_O) auth2-methods.o \
-	dns.o fatal.o compat.o utf8.o authfd.o canohost.o \
+	dns.o fatal.o compat.o $(LIBSSH_UTF8_OBJ) authfd.o canohost.o \
 	$(SKOBJS) $(WIN32_WMAIN_SSHD_OBJ)
 
 SSHD_SESSION_OBJS=sshd-session.o auth-rhosts.o auth-passwd.o \
@@ -340,6 +345,9 @@ wmain_sshd-auth.o: $(srcdir)/contrib/win32/win32compat/wmain_sshd-auth.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
 spawn-ext.o: $(srcdir)/contrib/win32/win32compat/spawn-ext.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+win32-utf8.o: $(srcdir)/contrib/win32/win32compat/win32-utf8.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
 shell-host.o: $(srcdir)/contrib/win32/win32compat/shell-host.c

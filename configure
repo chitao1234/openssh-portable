@@ -5885,6 +5885,36 @@ printf "%s\n" "#define WIN32_LEAN_AND_MEAN 1" >>confdefs.h
 printf "%s\n" "#define SUPPORT_CRLF 1" >>confdefs.h
 
 
+printf "%s\n" "#define USE_PIPES 1" >>confdefs.h
+
+
+printf "%s\n" "#define DISABLE_SHADOW 1" >>confdefs.h
+
+
+printf "%s\n" "#define DISABLE_FD_PASSING 1" >>confdefs.h
+
+
+printf "%s\n" "#define NO_X11_UNIX_SOCKETS 1" >>confdefs.h
+
+
+printf "%s\n" "#define FILESYSTEM_NO_BACKSLASH 1" >>confdefs.h
+
+
+printf "%s\n" "#define IP_TOS_IS_BROKEN 1" >>confdefs.h
+
+
+printf "%s\n" "#define BROKEN_TCGETATTR_ICANON 1" >>confdefs.h
+
+
+printf "%s\n" "#define GSSAPI 1" >>confdefs.h
+
+
+printf "%s\n" "#define GSSAPI_SSPI 1" >>confdefs.h
+
+
+printf "%s\n" "#define HAVE_GSSAPI_H 1" >>confdefs.h
+
+
 printf "%s\n" "#define BROKEN_READV_COMPARISON 1" >>confdefs.h
 
 

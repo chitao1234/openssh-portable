@@ -220,6 +220,15 @@ OM_uint32
 gss_import_name(_Out_ OM_uint32 * minor_status, _In_ gss_buffer_t input_name_buffer,
 	_In_ gss_OID input_name_type, _Out_ gss_name_t * output_name);
 
+OM_uint32
+gss_init_sec_context(
+	_Out_ OM_uint32 * minor_status, _In_ gss_cred_id_t claimant_cred_handle,
+	_Inout_ gss_ctx_id_t * context_handle, _In_ gss_name_t target_name,
+	_In_ gss_OID mech_type, _In_ OM_uint32 req_flags, _In_ OM_uint32 time_req,
+	_In_ gss_channel_bindings_t input_chan_bindings, _In_ gss_buffer_t input_token,
+	_Inout_ gss_OID * actual_mech_type, _Inout_ gss_buffer_t output_token,
+	_Out_ OM_uint32 * ret_flags, _Out_ OM_uint32 * time_rec);
+
 OM_uint32 
 gss_indicate_mechs(_Out_ OM_uint32 * minor_status, _Outptr_ gss_OID_set * mech_set);
 
