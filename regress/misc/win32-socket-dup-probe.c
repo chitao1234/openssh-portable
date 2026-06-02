@@ -40,6 +40,13 @@ enum accept_mode {
 	ACCEPT_EX
 };
 
+enum send_mode {
+	SEND_APC_NULL,
+	SEND_APC_COUNT,
+	SEND_EVENT,
+	SEND_SYNC
+};
+
 static const char *
 dup_mode_name(enum dup_mode mode)
 {
@@ -85,6 +92,38 @@ parse_accept_mode(const char *s, enum accept_mode *mode)
 		*mode = ACCEPT_NORMAL;
 	else if (strcmp(s, "acceptex") == 0)
 		*mode = ACCEPT_EX;
+	else
+		return -1;
+	return 0;
+}
+
+static const char *
+send_mode_name(enum send_mode mode)
+{
+	switch (mode) {
+	case SEND_APC_NULL:
+		return "apc-null";
+	case SEND_APC_COUNT:
+		return "apc-count";
+	case SEND_EVENT:
+		return "event";
+	case SEND_SYNC:
+		return "sync";
+	}
+	return "unknown";
+}
+
+static int
+parse_send_mode(const char *s, enum send_mode *mode)
+{
+	if (strcmp(s, "apc-null") == 0)
+		*mode = SEND_APC_NULL;
+	else if (strcmp(s, "apc-count") == 0)
+		*mode = SEND_APC_COUNT;
+	else if (strcmp(s, "event") == 0)
+		*mode = SEND_EVENT;
+	else if (strcmp(s, "sync") == 0)
+		*mode = SEND_SYNC;
 	else
 		return -1;
 	return 0;
@@ -354,8 +393,8 @@ wait_for_debugger(DWORD wait_ms)
 }
 
 static int
-spawn_child(const char *child_mode, DWORD wait_ms, SOCKET child_stdin,
-    PROCESS_INFORMATION *pi)
+spawn_child(const char *child_mode, const char *send_mode, DWORD wait_ms,
+    SOCKET child_stdin, PROCESS_INFORMATION *pi)
 {
 	char exe[MAX_PATH];
 	char cmdline[MAX_PATH + 128];
@@ -367,10 +406,11 @@ spawn_child(const char *child_mode, DWORD wait_ms, SOCKET child_stdin,
 	}
 	if (wait_ms != 0) {
 		snprintf(cmdline, sizeof(cmdline), "\"%s\" --child %s "
-		    "--wait-ms %lu", exe, child_mode, (unsigned long)wait_ms);
+		    "--send-mode %s --wait-ms %lu", exe, child_mode, send_mode,
+		    (unsigned long)wait_ms);
 	} else {
-		snprintf(cmdline, sizeof(cmdline), "\"%s\" --child %s", exe,
-		    child_mode);
+		snprintf(cmdline, sizeof(cmdline), "\"%s\" --child %s "
+		    "--send-mode %s", exe, child_mode, send_mode);
 	}
 	memset(&si, 0, sizeof(si));
 	memset(pi, 0, sizeof(*pi));
@@ -405,10 +445,12 @@ send_completion(DWORD error, DWORD bytes, LPWSAOVERLAPPED overlapped,
 }
 
 static int
-send_with_apc_wsasend(SOCKET s, const char *payload)
+send_with_apc_wsasend(SOCKET s, const char *payload, int count_arg)
 {
 	OVERLAPPED ov;
 	WSABUF buf;
+	DWORD immediate_bytes = 0;
+	LPDWORD immediate_bytes_ptr;
 	int ret, i;
 
 	memset(&ov, 0, sizeof(ov));
@@ -417,17 +459,21 @@ send_with_apc_wsasend(SOCKET s, const char *payload)
 	send_bytes = 0;
 	buf.buf = (char *)payload;
 	buf.len = (ULONG)strlen(payload);
+	immediate_bytes_ptr = count_arg ? &immediate_bytes : NULL;
 
-	fprintf(stderr, "child: calling WSASend socket=%p len=%lu\n",
-	    (void *)(UINT_PTR)s, (unsigned long)buf.len);
-	ret = WSASend(s, &buf, 1, NULL, 0, &ov, send_completion);
+	fprintf(stderr, "child: calling APC WSASend socket=%p len=%lu "
+	    "count_arg=%s\n", (void *)(UINT_PTR)s, (unsigned long)buf.len,
+	    count_arg ? "ptr" : "null");
+	ret = WSASend(s, &buf, 1, immediate_bytes_ptr, 0, &ov,
+	    send_completion);
 	if (ret == SOCKET_ERROR) {
 		int err = WSAGetLastError();
 		fprintf(stderr, "child: WSASend returned SOCKET_ERROR: %d\n", err);
 		if (err != WSA_IO_PENDING)
 			return -1;
 	} else {
-		fprintf(stderr, "child: WSASend returned 0\n");
+		fprintf(stderr, "child: WSASend returned 0 immediate_bytes=%lu\n",
+		    (unsigned long)immediate_bytes);
 	}
 
 	for (i = 0; i < 50 && !send_done; i++)
@@ -442,7 +488,87 @@ send_with_apc_wsasend(SOCKET s, const char *payload)
 }
 
 static int
-child_main(enum dup_mode mode, DWORD wait_ms)
+send_with_event_wsasend(SOCKET s, const char *payload)
+{
+	OVERLAPPED ov;
+	WSABUF buf;
+	DWORD transferred = 0, flags = 0;
+	HANDLE event_handle;
+	int ret;
+
+	memset(&ov, 0, sizeof(ov));
+	event_handle = CreateEventA(NULL, TRUE, FALSE, NULL);
+	if (event_handle == NULL) {
+		fprintf(stderr, "child: CreateEvent failed: %lu\n", GetLastError());
+		return -1;
+	}
+	ov.hEvent = event_handle;
+	buf.buf = (char *)payload;
+	buf.len = (ULONG)strlen(payload);
+
+	fprintf(stderr, "child: calling event WSASend socket=%p len=%lu\n",
+	    (void *)(UINT_PTR)s, (unsigned long)buf.len);
+	ret = WSASend(s, &buf, 1, NULL, 0, &ov, NULL);
+	if (ret == SOCKET_ERROR) {
+		int err = WSAGetLastError();
+		fprintf(stderr, "child: WSASend returned SOCKET_ERROR: %d\n", err);
+		if (err != WSA_IO_PENDING) {
+			CloseHandle(event_handle);
+			return -1;
+		}
+	} else {
+		fprintf(stderr, "child: WSASend returned 0\n");
+	}
+	if (!WSAGetOverlappedResult(s, &ov, &transferred, TRUE, &flags)) {
+		fprintf(stderr, "child: WSAGetOverlappedResult failed: %d\n",
+		    WSAGetLastError());
+		CloseHandle(event_handle);
+		return -1;
+	}
+	fprintf(stderr, "child: event WSASend transferred=%lu flags=0x%lx\n",
+	    (unsigned long)transferred, (unsigned long)flags);
+	CloseHandle(event_handle);
+	return transferred == buf.len ? 0 : -1;
+}
+
+static int
+send_with_sync_wsasend(SOCKET s, const char *payload)
+{
+	WSABUF buf;
+	DWORD transferred = 0;
+
+	buf.buf = (char *)payload;
+	buf.len = (ULONG)strlen(payload);
+	fprintf(stderr, "child: calling sync WSASend socket=%p len=%lu\n",
+	    (void *)(UINT_PTR)s, (unsigned long)buf.len);
+	if (WSASend(s, &buf, 1, &transferred, 0, NULL, NULL) == SOCKET_ERROR) {
+		fprintf(stderr, "child: sync WSASend failed: %d\n",
+		    WSAGetLastError());
+		return -1;
+	}
+	fprintf(stderr, "child: sync WSASend transferred=%lu\n",
+	    (unsigned long)transferred);
+	return transferred == buf.len ? 0 : -1;
+}
+
+static int
+send_payload(SOCKET s, const char *payload, enum send_mode send_mode)
+{
+	switch (send_mode) {
+	case SEND_APC_NULL:
+		return send_with_apc_wsasend(s, payload, 0);
+	case SEND_APC_COUNT:
+		return send_with_apc_wsasend(s, payload, 1);
+	case SEND_EVENT:
+		return send_with_event_wsasend(s, payload);
+	case SEND_SYNC:
+		return send_with_sync_wsasend(s, payload);
+	}
+	return -1;
+}
+
+static int
+child_main(enum dup_mode mode, enum send_mode send_mode, DWORD wait_ms)
 {
 	SOCKET inherited, target;
 	char payload[128];
@@ -460,8 +586,9 @@ child_main(enum dup_mode mode, DWORD wait_ms)
 		return 3;
 	}
 	describe_socket("child target", target);
-	snprintf(payload, sizeof(payload), "probe mode=%s\r\n", dup_mode_name(mode));
-	ret = send_with_apc_wsasend(target, payload);
+	snprintf(payload, sizeof(payload), "probe mode=%s send=%s\r\n",
+	    dup_mode_name(mode), send_mode_name(send_mode));
+	ret = send_payload(target, payload, send_mode);
 	if (target != inherited)
 		closesocket(target);
 	WSACleanup();
@@ -470,8 +597,8 @@ child_main(enum dup_mode mode, DWORD wait_ms)
 
 static int
 run_one(enum accept_mode accept_mode, enum dup_mode handoff_mode,
-    enum dup_mode child_mode, unsigned short port, DWORD child_wait_ms,
-    int recv_timeout_ms)
+    enum dup_mode child_mode, enum send_mode send_mode, unsigned short port,
+    DWORD child_wait_ms, int recv_timeout_ms)
 {
 	SOCKET listen_sock = INVALID_SOCKET;
 	SOCKET client_sock = INVALID_SOCKET;
@@ -482,9 +609,9 @@ run_one(enum accept_mode accept_mode, enum dup_mode handoff_mode,
 	int n, result = 1;
 	DWORD exit_code = 0;
 
-	fprintf(stderr, "\n=== accept=%s handoff=%s child=%s port=%u ===\n",
+	fprintf(stderr, "\n=== accept=%s handoff=%s child=%s send=%s port=%u ===\n",
 	    accept_mode_name(accept_mode), dup_mode_name(handoff_mode),
-	    dup_mode_name(child_mode), port);
+	    dup_mode_name(child_mode), send_mode_name(send_mode), port);
 
 	if (make_listener(port, &listen_sock) != 0)
 		goto out;
@@ -510,8 +637,8 @@ run_one(enum accept_mode accept_mode, enum dup_mode handoff_mode,
 		goto out;
 	describe_socket("parent child-stdin", child_stdin);
 
-	if (spawn_child(dup_mode_name(child_mode), child_wait_ms, child_stdin,
-	    &pi) != 0)
+	if (spawn_child(dup_mode_name(child_mode), send_mode_name(send_mode),
+	    child_wait_ms, child_stdin, &pi) != 0)
 		goto out;
 	closesocket(child_stdin);
 	child_stdin = INVALID_SOCKET;
@@ -553,8 +680,10 @@ usage(const char *prog)
 	    "usage:\n"
 	    "  %s [--accept accept|acceptex] [--handoff raw|duphandle|wsadup|wsadup-overlapped]\n"
 	    "     [--mode raw|duphandle|wsadup|wsadup-overlapped] [--port N]\n"
+	    "     [--send-mode apc-null|apc-count|event|sync]\n"
 	    "     [--child-wait-ms N] [--recv-timeout-ms N]\n"
-	    "  %s --child raw|duphandle|wsadup|wsadup-overlapped [--wait-ms N]\n",
+	    "  %s --child raw|duphandle|wsadup|wsadup-overlapped\n"
+	    "     [--send-mode apc-null|apc-count|event|sync] [--wait-ms N]\n",
 	    prog, prog);
 }
 
@@ -564,6 +693,7 @@ main(int argc, char **argv)
 	enum accept_mode accept_mode = ACCEPT_EX;
 	enum dup_mode handoff_mode = MODE_WSADUP_OVERLAPPED;
 	enum dup_mode child_mode = MODE_RAW;
+	enum send_mode send_mode = SEND_APC_NULL;
 	unsigned short port = 22331;
 	DWORD child_wait_ms = 0;
 	DWORD wait_ms = 0;
@@ -594,6 +724,11 @@ main(int argc, char **argv)
 				return 2;
 			}
 			single_mode = 1;
+		} else if (strcmp(argv[i], "--send-mode") == 0 && i + 1 < argc) {
+			if (parse_send_mode(argv[++i], &send_mode) != 0) {
+				usage(argv[0]);
+				return 2;
+			}
 		} else if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
 			long p = strtol(argv[++i], NULL, 10);
 			if (p <= 1024 || p > 65535) {
@@ -622,22 +757,22 @@ main(int argc, char **argv)
 	}
 
 	if (child)
-		return child_main(child_mode, wait_ms);
+		return child_main(child_mode, send_mode, wait_ms);
 
 	if (start_winsock() != 0)
 		return 2;
 	if (single_mode) {
-		failures += run_one(accept_mode, handoff_mode, child_mode, port,
-		    child_wait_ms, recv_timeout_ms);
+		failures += run_one(accept_mode, handoff_mode, child_mode,
+		    send_mode, port, child_wait_ms, recv_timeout_ms);
 	} else {
-		failures += run_one(accept_mode, handoff_mode, MODE_RAW, port++,
-		    child_wait_ms, recv_timeout_ms);
+		failures += run_one(accept_mode, handoff_mode, MODE_RAW,
+		    send_mode, port++, child_wait_ms, recv_timeout_ms);
 		failures += run_one(accept_mode, handoff_mode, MODE_DUPHANDLE,
-		    port++, child_wait_ms, recv_timeout_ms);
+		    send_mode, port++, child_wait_ms, recv_timeout_ms);
 		failures += run_one(accept_mode, handoff_mode, MODE_WSADUP,
-		    port++, child_wait_ms, recv_timeout_ms);
+		    send_mode, port++, child_wait_ms, recv_timeout_ms);
 		failures += run_one(accept_mode, handoff_mode,
-		    MODE_WSADUP_OVERLAPPED, port++, child_wait_ms,
+		    MODE_WSADUP_OVERLAPPED, send_mode, port++, child_wait_ms,
 		    recv_timeout_ms);
 	}
 	WSACleanup();
