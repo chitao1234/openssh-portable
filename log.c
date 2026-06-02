@@ -68,6 +68,9 @@ static log_handler_fn *log_handler;
 static void *log_handler_ctx;
 static char **log_verbose;
 static size_t nlog_verbose;
+#ifdef WINDOWS
+static int log_stderr_write_in_progress;
+#endif
 
 extern char *__progname;
 
@@ -361,6 +364,10 @@ do_log(LogLevel level, int force, const char *suffix, const char *fmt,
 
 	if (!force && level > log_level)
 		return;
+#ifdef WINDOWS
+	if (log_on_stderr && log_stderr_write_in_progress)
+		return;
+#endif
 
 	switch (level) {
 	case SYSLOG_LEVEL_FATAL:
@@ -419,7 +426,13 @@ do_log(LogLevel level, int force, const char *suffix, const char *fmt,
 		    (log_on_stderr > 1) ? progname : "",
 		    (log_on_stderr > 1) ? ": " : "",
 		    (int)sizeof msgbuf - 3, fmtbuf);
+#ifdef WINDOWS
+		log_stderr_write_in_progress = 1;
+#endif
 		(void)write(log_stderr_fd, msgbuf, strlen(msgbuf));
+#ifdef WINDOWS
+		log_stderr_write_in_progress = 0;
+#endif
 	} else {
 #if defined(HAVE_OPENLOG_R) && defined(SYSLOG_DATA_INIT)
 		openlog_r(progname, LOG_PID, log_facility, &sdata);

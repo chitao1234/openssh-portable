@@ -813,10 +813,13 @@ fileio_write(struct w32_io* pio, const void *buf, size_t max_bytes)
 	}
 
 	if (pio->write_details.error) {
-		errno = errno_from_Win32Error(pio->write_details.error);
-		debug3("write - ERROR:%d on prior unblocking write, io:%p", errno, pio);
+		DWORD write_error = pio->write_details.error;
+
 		pio->write_details.error = 0;
-		if ((FILETYPE(pio) == FILE_TYPE_PIPE) && (errno == ERROR_BROKEN_PIPE)) {
+		errno = errno_from_Win32Error(write_error);
+		debug3("write - ERROR:%d on prior unblocking write, io:%p", errno, pio);
+		if ((FILETYPE(pio) == FILE_TYPE_PIPE) &&
+		    (write_error == ERROR_BROKEN_PIPE)) {
 			debug4("write - ERROR:read end of the pipe closed, io:%p", pio);
 			errno = EPIPE;
 		}
@@ -878,9 +881,11 @@ fileio_write(struct w32_io* pio, const void *buf, size_t max_bytes)
 
 	/* if write has completed, pick up any error reported*/
 	if (!pio->write_details.pending && pio->write_details.error) {
-		errno = errno_from_Win32Error(pio->write_details.error);
-		debug3("write - ERROR from cb:%d, io:%p", pio->write_details.error, pio);
+		DWORD write_error = pio->write_details.error;
+
 		pio->write_details.error = 0;
+		errno = errno_from_Win32Error(write_error);
+		debug3("write - ERROR from cb:%d, io:%p", write_error, pio);
 		return -1;
 	}
 	debug4("write - reporting %d bytes written, io:%p", bytes_copied, pio);
