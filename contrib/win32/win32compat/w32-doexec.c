@@ -442,7 +442,8 @@ int do_exec_windows(struct ssh *ssh, Session *s, const char *command, int pty) {
 	memset(&job_info, 0, sizeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
 	job_info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK;
 
-	if ((process_handle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid)) == NULL) {
+	if ((process_handle = OpenProcess(PROCESS_DUP_HANDLE |
+	    PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, pid)) == NULL) {
 		errno = EOTHER;
 		error("cannot get process handle: %d", GetLastError());
 		goto cleanup;
