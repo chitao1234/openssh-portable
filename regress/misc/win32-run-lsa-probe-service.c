@@ -11,6 +11,8 @@
  *   sc start openssh-lsa-probe subauth
  *   sc start openssh-lsa-probe authpkg
  *   sc start openssh-lsa-probe authpkg-cmd
+ *   sc start openssh-lsa-probe authpkg-cmd-batch
+ *   sc start openssh-lsa-probe authpkg-cmd-detached
  */
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0501
@@ -73,7 +75,27 @@ run_child(const char *mode)
 	HANDLE out = INVALID_HANDLE_VALUE;
 	DWORD exit_code = 1;
 
-	if (mode != NULL && strcmp(mode, "authpkg-cmd") == 0)
+	if (mode != NULL && strcmp(mode, "authpkg-cmd-batch") == 0)
+		cmd = "C:\\chi\\win32-lsa-auth-probe.exe --user xpuser "
+		    "--domain . --logon-type batch --env --cwd C:\\chi "
+		    "--create-flags no-window --cmd \"cmd /c echo TOKEN_OK && "
+		    "set USERNAME\"";
+	else if (mode != NULL && strcmp(mode, "authpkg-cmd-interactive") == 0)
+		cmd = "C:\\chi\\win32-lsa-auth-probe.exe --user xpuser "
+		    "--domain . --logon-type interactive --env --cwd C:\\chi "
+		    "--create-flags no-window --cmd \"cmd /c echo TOKEN_OK && "
+		    "set USERNAME\"";
+	else if (mode != NULL && strcmp(mode, "authpkg-cmd-detached") == 0)
+		cmd = "C:\\chi\\win32-lsa-auth-probe.exe --user xpuser "
+		    "--domain . --cwd C:\\chi --create-flags detached "
+		    "--no-stdio --cmd \"cmd /c echo TOKEN_OK > "
+		    "C:\\chi\\lsa-token-child.out\"";
+	else if (mode != NULL && strcmp(mode, "authpkg-cmd-no-stdio") == 0)
+		cmd = "C:\\chi\\win32-lsa-auth-probe.exe --user xpuser "
+		    "--domain . --cwd C:\\chi --create-flags no-window "
+		    "--no-stdio --cmd \"cmd /c echo TOKEN_OK > "
+		    "C:\\chi\\lsa-token-child.out\"";
+	else if (mode != NULL && strcmp(mode, "authpkg-cmd") == 0)
 		cmd = "C:\\chi\\win32-lsa-auth-probe.exe --user xpuser "
 		    "--domain . --cmd \"cmd /c echo TOKEN_OK && set USERNAME\"";
 	else if (mode != NULL && strcmp(mode, "authpkg") == 0)

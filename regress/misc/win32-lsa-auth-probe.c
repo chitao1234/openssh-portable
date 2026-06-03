@@ -5,7 +5,7 @@
  *   i686-w64-mingw32-gcc -Wall -Wextra -O0 -g \
  *       -o win32-lsa-auth-probe.exe \
  *       ../openssh-portable/regress/misc/win32-lsa-auth-probe.c \
- *       -ladvapi32 -lsecur32
+ *       -ladvapi32 -lsecur32 -luserenv
  *
  * The matching package returns a diagnostic local-user token when LSASS
  * accepts the probe request. A useful XP result is a returned token plus an
@@ -21,6 +21,7 @@
 #include <windows.h>
 #include <ntsecapi.h>
 #include <sddl.h>
+#include <userenv.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,6 +34,14 @@
 #define OPENSSH_LSA_AUTH_PROBE_PACKAGE "OpenSSHLsaProbe"
 #define OPENSSH_LSA_AUTH_PROBE_MAGIC 0x4f535841UL /* "OSXA" */
 #define OPENSSH_LSA_AUTH_PROBE_VERSION 1
+
+typedef struct _SPAWN_OPTIONS {
+	const char *cmd;
+	const char *cwd;
+	DWORD flags;
+	int use_stdio;
+	int use_environment;
+} SPAWN_OPTIONS;
 
 typedef struct _OPENSSH_LSA_AUTH_PROBE_REQUEST {
 	ULONG magic;
@@ -217,13 +226,27 @@ print_token_details(HANDLE token)
 	free(privs);
 }
 
+static void
+print_token_type(const char *prefix, HANDLE token)
+{
+	TOKEN_TYPE token_type;
+	DWORD needed = 0;
+
+	if (GetTokenInformation(token, TokenType, &token_type,
+	    sizeof(token_type), &needed))
+		printf("%s token type: %s\n", prefix,
+		    token_type == TokenPrimary ? "primary" : "impersonation");
+}
+
 static int
-spawn_as_token(HANDLE token, const char *cmd)
+spawn_as_token(HANDLE token, const SPAWN_OPTIONS *options)
 {
 	STARTUPINFOW si;
 	PROCESS_INFORMATION pi;
 	HANDLE primary = NULL;
 	wchar_t *cmd_w = NULL;
+	wchar_t *cwd_w = NULL;
+	LPVOID environment = NULL;
 	DWORD exit_code = 0;
 	int ret = -1;
 
@@ -232,19 +255,32 @@ spawn_as_token(HANDLE token, const char *cmd)
 		printf("DuplicateTokenEx failed: %lu\n", GetLastError());
 		goto done;
 	}
-	if ((cmd_w = utf8_to_utf16(cmd)) == NULL)
+	print_token_type("primary duplicate", primary);
+	if ((cmd_w = utf8_to_utf16(options->cmd)) == NULL)
+		goto done;
+	if (options->cwd != NULL && (cwd_w = utf8_to_utf16(options->cwd)) ==
+	    NULL)
 		goto done;
 
 	memset(&si, 0, sizeof(si));
 	memset(&pi, 0, sizeof(pi));
 	si.cb = sizeof(si);
-	si.dwFlags = STARTF_USESTDHANDLES;
-	si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-	si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-	si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+	if (options->use_stdio) {
+		si.dwFlags = STARTF_USESTDHANDLES;
+		si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+		si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+		si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+	}
+	if (options->use_environment &&
+	    !CreateEnvironmentBlock(&environment, primary, TRUE)) {
+		printf("CreateEnvironmentBlock failed: %lu\n", GetLastError());
+		goto done;
+	}
 
-	if (!CreateProcessAsUserW(primary, NULL, cmd_w, NULL, NULL, TRUE,
-	    0, NULL, NULL, &si, &pi)) {
+	if (!CreateProcessAsUserW(primary, NULL, cmd_w, NULL, NULL,
+	    options->use_stdio ? TRUE : FALSE, options->flags |
+	    (environment != NULL ? CREATE_UNICODE_ENVIRONMENT : 0),
+	    environment, cwd_w, &si, &pi)) {
 		printf("CreateProcessAsUserW failed: %lu\n", GetLastError());
 		goto done;
 	}
@@ -259,8 +295,11 @@ done:
 		CloseHandle(pi.hThread);
 	if (pi.hProcess != NULL)
 		CloseHandle(pi.hProcess);
+	if (environment != NULL)
+		DestroyEnvironmentBlock(environment);
 	if (primary != NULL)
 		CloseHandle(primary);
+	free(cwd_w);
 	free(cmd_w);
 	return ret;
 }
@@ -270,13 +309,45 @@ usage(const char *prog)
 {
 	fprintf(stderr,
 	    "usage: %s --user USER [--domain DOMAIN] [--package NAME]"
-	    " [--cmd COMMAND]\n", prog);
+	    " [--logon-type network|batch|interactive] [--cmd COMMAND]"
+	    " [--cwd DIR] [--create-flags none|no-window|detached]"
+	    " [--no-stdio] [--env]\n", prog);
+}
+
+static int
+parse_logon_type(const char *s, SECURITY_LOGON_TYPE *out)
+{
+	if (strcmp(s, "network") == 0)
+		*out = Network;
+	else if (strcmp(s, "batch") == 0)
+		*out = Batch;
+	else if (strcmp(s, "interactive") == 0)
+		*out = Interactive;
+	else
+		return -1;
+	return 0;
+}
+
+static int
+parse_create_flags(const char *s, DWORD *out)
+{
+	if (strcmp(s, "none") == 0)
+		*out = 0;
+	else if (strcmp(s, "no-window") == 0)
+		*out = CREATE_NO_WINDOW;
+	else if (strcmp(s, "detached") == 0)
+		*out = DETACHED_PROCESS;
+	else
+		return -1;
+	return 0;
 }
 
 int
 main(int argc, char **argv)
 {
-	const char *user = NULL, *domain = ".", *package = NULL, *cmd = NULL;
+	const char *user = NULL, *domain = ".", *package = NULL;
+	SECURITY_LOGON_TYPE logon_type = Network;
+	SPAWN_OPTIONS spawn_options;
 	wchar_t *user_w = NULL, *domain_w = NULL;
 	OPENSSH_LSA_AUTH_PROBE_REQUEST *request = NULL;
 	size_t request_len, off, user_bytes, domain_bytes;
@@ -292,6 +363,8 @@ main(int argc, char **argv)
 	NTSTATUS status, substatus = 0;
 	int i, ret = 1;
 
+	memset(&spawn_options, 0, sizeof(spawn_options));
+	spawn_options.use_stdio = 1;
 	for (i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--user") == 0 && i + 1 < argc)
 			user = argv[++i];
@@ -300,7 +373,25 @@ main(int argc, char **argv)
 		else if (strcmp(argv[i], "--package") == 0 && i + 1 < argc)
 			package = argv[++i];
 		else if (strcmp(argv[i], "--cmd") == 0 && i + 1 < argc)
-			cmd = argv[++i];
+			spawn_options.cmd = argv[++i];
+		else if (strcmp(argv[i], "--cwd") == 0 && i + 1 < argc)
+			spawn_options.cwd = argv[++i];
+		else if (strcmp(argv[i], "--logon-type") == 0 && i + 1 < argc) {
+			if (parse_logon_type(argv[++i], &logon_type) != 0) {
+				usage(argv[0]);
+				return 2;
+			}
+		} else if (strcmp(argv[i], "--create-flags") == 0 &&
+		    i + 1 < argc) {
+			if (parse_create_flags(argv[++i],
+			    &spawn_options.flags) != 0) {
+				usage(argv[0]);
+				return 2;
+			}
+		} else if (strcmp(argv[i], "--no-stdio") == 0)
+			spawn_options.use_stdio = 0;
+		else if (strcmp(argv[i], "--env") == 0)
+			spawn_options.use_environment = 1;
 		else {
 			usage(argv[0]);
 			return 2;
@@ -357,7 +448,7 @@ main(int argc, char **argv)
 		goto done;
 	}
 	init_lsa_string(&origin_name, "openssh-lsa-auth-probe");
-	status = LsaLogonUser(lsa, &origin_name, Network, auth_package,
+	status = LsaLogonUser(lsa, &origin_name, logon_type, auth_package,
 	    request, (ULONG)request_len, NULL, &source, &profile, &profile_len,
 	    &logon_id, &token, &quotas, &substatus);
 	printf("LsaLogonUser package=%s status=0x%08lx substatus=0x%08lx "
@@ -368,7 +459,8 @@ main(int argc, char **argv)
 
 	print_token_user(token);
 	print_token_details(token);
-	if (cmd != NULL && spawn_as_token(token, cmd) != 0)
+	if (spawn_options.cmd != NULL && spawn_as_token(token,
+	    &spawn_options) != 0)
 		goto done;
 	ret = 0;
 
