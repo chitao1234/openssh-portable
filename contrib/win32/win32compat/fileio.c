@@ -195,6 +195,7 @@ fileio_connect(struct w32_io* pio, char* name)
 {
 	wchar_t* name_w = NULL;
 	HANDLE h = INVALID_HANDLE_VALUE;
+	DWORD flags;
 	int ret = 0;
 
 	if (pio->handle != 0 && pio->handle != INVALID_HANDLE_VALUE) {
@@ -208,10 +209,14 @@ fileio_connect(struct w32_io* pio, char* name)
 		errno = ENOMEM;
 		return -1;
 	}
+
+	flags = FILE_FLAG_OVERLAPPED | SECURITY_SQOS_PRESENT;
+	flags |= pIsWindowsVistaOrGreater() ?
+	    SECURITY_IDENTIFICATION : SECURITY_IMPERSONATION;
 	
 	do {
 		h = CreateFileW(name_w, GENERIC_READ | GENERIC_WRITE, 0,
-			NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED | SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION, NULL);
+		    NULL, OPEN_EXISTING, flags, NULL);
 	
 		if (h != INVALID_HANDLE_VALUE)
 			break;
