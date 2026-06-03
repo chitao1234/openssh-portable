@@ -769,11 +769,20 @@ SendCharacter(HANDLE hInput, WORD attributes, wchar_t character)
 void 
 SendBuffer(HANDLE hInput, CHAR_INFO *buffer, DWORD bufferSize)
 {
+	DWORD i;
+	BOOL has_visible_output = FALSE;
+
 	if (bufferSize <= 0)
 		return;
 
-	bConsoleOutputSeen = TRUE;
-	for (DWORD i = 0; i < bufferSize; i++)
+	for (i = 0; i < bufferSize; i++) {
+		if (buffer[i].Char.UnicodeChar != L'\0' &&
+		    buffer[i].Char.UnicodeChar != L' ')
+			has_visible_output = TRUE;
+	}
+	if (has_visible_output)
+		bConsoleOutputSeen = TRUE;
+	for (i = 0; i < bufferSize; i++)
 		SendCharacter(hInput, buffer[i].Attributes, buffer[i].Char.UnicodeChar);
 }
 
@@ -1301,8 +1310,12 @@ ProcessPipes(LPVOID p)
 	}
 
 cleanup:
-	/* pipe_in has ended */
-	PostThreadMessage(hostThreadId, WM_APPEXIT, 0, 0);
+	/*
+	 * pipe_in EOF only means the SSH channel will send no more input.  A
+	 * remote command with a pty reaches this path immediately after exec,
+	 * before the child has necessarily produced output.  Let MonitorChild
+	 * own shellhost lifetime so the console bridge can drain child output.
+	 */
 	dwStatus = GetLastError();
 	return 0;
 }
@@ -1389,7 +1402,7 @@ cleanup:
 }
 
 int 
-start_with_pty(wchar_t *command)
+start_with_pty(wchar_t *command, BOOL direct_exec)
 {
 	STARTUPINFOW si;
 	PROCESS_INFORMATION pi;
@@ -1481,9 +1494,14 @@ start_with_pty(wchar_t *command)
 	SetStdHandle(STD_ERROR_HANDLE, child_out);
 
 	/*
-	* Launch via cmd.exe /c, otherwise known issues exist with color rendering in powershell
-	*/
-	_snwprintf_s(cmd, MAX_CMD_LEN, MAX_CMD_LEN, L"\"%ls\\cmd.exe\" /c \"%ls\"", system32_path, command);
+	 * sshd passes an already-formed shell command. Launch it directly so a
+	 * quoted shell path is not wrapped in another cmd.exe /c layer.
+	 */
+	if (direct_exec)
+		_snwprintf_s(cmd, MAX_CMD_LEN, MAX_CMD_LEN, L"%ls", command);
+	else
+		_snwprintf_s(cmd, MAX_CMD_LEN, MAX_CMD_LEN,
+		    L"\"%ls\\cmd.exe\" /c \"%ls\"", system32_path, command);
 
 	SetConsoleCtrlHandler(NULL, FALSE);
 	GOTO_CLEANUP_ON_FALSE(CreateProcessW(NULL, cmd, NULL, NULL, TRUE, CREATE_SUSPENDED,
@@ -1615,6 +1633,9 @@ int start_as_shell(wchar_t* cmd)
  * Usage:
  * Execute commandline with PTY 
  *   ssh-shellhost.exe ---pty commandline
+ *   ssh-shellhost.exe ---pty-exec commandline
+ * The ---pty-exec form launches commandline directly. It is used by sshd
+ * after it has already composed the user's default shell invocation.
  * Note that in PTY mode, stderr is taken as the control channel
  * to receive Windows size change events
  *
@@ -1630,6 +1651,7 @@ wmain(int ac, wchar_t **av)
 {
 	wchar_t *exec_command, *option, *cmdline = NULL;
 	int with_pty, len;
+	BOOL direct_exec = FALSE;
 
 	_set_invalid_parameter_handler(my_invalid_parameter_handler);
 
@@ -1641,7 +1663,10 @@ wmain(int ac, wchar_t **av)
 		exit(255);
 	}
 
-	if (option = wcsstr(cmdline, L" ---pty "))
+	if (option = wcsstr(cmdline, L" ---pty-exec ")) {
+		with_pty = 1;
+		direct_exec = TRUE;
+	} else if (option = wcsstr(cmdline, L" ---pty "))
 		with_pty = 1;
 	else if (option = wcsstr(cmdline, L" -c "))
 		with_pty = 0;
@@ -1649,7 +1674,8 @@ wmain(int ac, wchar_t **av)
 		goto usage;
 
 	if (with_pty)
-		exec_command = option + wcslen(L" ---pty ");
+		exec_command = option + (direct_exec ?
+		    wcslen(L" ---pty-exec ") : wcslen(L" ---pty "));
 	else
 		exec_command = option + wcslen(L" -c ");
 
@@ -1661,7 +1687,7 @@ wmain(int ac, wchar_t **av)
 		goto usage;
 
 	if (with_pty)
-		return start_with_pty(exec_command);
+		return start_with_pty(exec_command, direct_exec);
 	else {
 		/* if commandline is enclosed in double quotes, remove them */
 		len = (int)wcslen(exec_command);
