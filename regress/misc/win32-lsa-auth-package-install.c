@@ -10,8 +10,8 @@
  *       -ladvapi32
  *
  * Usage:
- *   win32-lsa-auth-package-install.exe install
- *   win32-lsa-auth-package-install.exe remove
+ *   win32-lsa-auth-package-install.exe install [package-name]
+ *   win32-lsa-auth-package-install.exe remove [package-name]
  */
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0501
@@ -60,12 +60,12 @@ read_auth_packages(HKEY key, char **out, DWORD *out_bytes)
 }
 
 static int
-package_present(const char *multi)
+package_present(const char *multi, const char *package)
 {
 	const char *p;
 
 	for (p = multi; *p != '\0'; p += strlen(p) + 1) {
-		if (_stricmp(p, PROBE_PACKAGE) == 0)
+		if (_stricmp(p, package) == 0)
 			return 1;
 	}
 	return 0;
@@ -106,13 +106,14 @@ write_auth_packages(HKEY key, const char *multi)
 }
 
 static int
-install_package(HKEY key, const char *old, DWORD old_bytes)
+install_package(HKEY key, const char *old, DWORD old_bytes,
+    const char *package)
 {
 	char *next;
-	DWORD add_bytes = sizeof(PROBE_PACKAGE);
+	DWORD add_bytes = (DWORD)strlen(package) + 1;
 	int ret;
 
-	if (package_present(old)) {
+	if (package_present(old, package)) {
 		print_packages(old);
 		return 0;
 	}
@@ -122,7 +123,7 @@ install_package(HKEY key, const char *old, DWORD old_bytes)
 		return 1;
 	if (old_bytes > 0)
 		memcpy(next, old, old_bytes - 1);
-	memcpy(next + old_bytes - 1, PROBE_PACKAGE, add_bytes);
+	memcpy(next + old_bytes - 1, package, add_bytes);
 	next[old_bytes - 1 + add_bytes] = '\0';
 
 	ret = write_auth_packages(key, next);
@@ -133,7 +134,7 @@ install_package(HKEY key, const char *old, DWORD old_bytes)
 }
 
 static int
-remove_package(HKEY key, const char *old)
+remove_package(HKEY key, const char *old, const char *package)
 {
 	const char *p;
 	char *next, *out;
@@ -145,7 +146,7 @@ remove_package(HKEY key, const char *old)
 	out = next;
 	for (p = old; *p != '\0'; p += strlen(p) + 1) {
 		size_t len = strlen(p) + 1;
-		if (_stricmp(p, PROBE_PACKAGE) == 0)
+		if (_stricmp(p, package) == 0)
 			continue;
 		memcpy(out, p, len);
 		out += len;
@@ -164,14 +165,18 @@ main(int argc, char **argv)
 {
 	HKEY key = NULL;
 	char *multi = NULL;
+	const char *package = PROBE_PACKAGE;
 	DWORD bytes = 0, err;
 	int ret = 1;
 
-	if (argc != 2 ||
+	if ((argc != 2 && argc != 3) ||
 	    (strcmp(argv[1], "install") != 0 && strcmp(argv[1], "remove") != 0)) {
-		fprintf(stderr, "usage: %s install|remove\n", argv[0]);
+		fprintf(stderr, "usage: %s install|remove [package-name]\n",
+		    argv[0]);
 		return 2;
 	}
+	if (argc == 3)
+		package = argv[2];
 
 	err = RegOpenKeyExA(HKEY_LOCAL_MACHINE, LSA_KEY, 0,
 	    KEY_QUERY_VALUE | KEY_SET_VALUE, &key);
@@ -183,9 +188,9 @@ main(int argc, char **argv)
 		goto done;
 
 	if (strcmp(argv[1], "install") == 0)
-		ret = install_package(key, multi, bytes);
+		ret = install_package(key, multi, bytes, package);
 	else
-		ret = remove_package(key, multi);
+		ret = remove_package(key, multi, package);
 
 done:
 	free(multi);

@@ -22,10 +22,13 @@
 #include <ntsecapi.h>
 #include <sddl.h>
 #include <userenv.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
+
+#include "contrib/win32/win32compat/openssh_lsa_auth.h"
 
 #ifndef STATUS_SUCCESS
 #define STATUS_SUCCESS ((NTSTATUS)0x00000000L)
@@ -52,6 +55,29 @@ typedef struct _OPENSSH_LSA_AUTH_PROBE_REQUEST {
 	ULONG domain_bytes;
 	/* WCHAR user[], domain[] follow. */
 } OPENSSH_LSA_AUTH_PROBE_REQUEST;
+
+static void *
+build_string_request(size_t fixed_len, size_t user_offset,
+    size_t domain_offset, const wchar_t *user_w, const wchar_t *domain_w,
+    size_t *request_len)
+{
+	BYTE *request;
+	size_t off, user_bytes, domain_bytes;
+
+	user_bytes = (wcslen(user_w) + 1) * sizeof(wchar_t);
+	domain_bytes = (wcslen(domain_w) + 1) * sizeof(wchar_t);
+	*request_len = fixed_len + user_bytes + domain_bytes;
+	request = (BYTE *)calloc(1, *request_len);
+	if (request == NULL)
+		return NULL;
+	*(ULONG *)(request + user_offset) = (ULONG)user_bytes;
+	*(ULONG *)(request + domain_offset) = (ULONG)domain_bytes;
+	off = fixed_len;
+	memcpy(request + off, user_w, user_bytes);
+	off += user_bytes;
+	memcpy(request + off, domain_w, domain_bytes);
+	return request;
+}
 
 static void
 init_lsa_string(LSA_STRING *s, const char *value)
@@ -347,7 +373,7 @@ usage(const char *prog)
 	    " [--logon-type network|batch|interactive] [--cmd COMMAND]"
 	    " [--cwd DIR] [--create-flags none|no-window|detached]"
 	    " [--no-stdio] [--stdio-file FILE] [--env] [--untrusted]"
-	    " [--call-package]\n",
+	    " [--call-package] [--openssh-lsa-auth]\n",
 	    prog);
 }
 
@@ -399,7 +425,7 @@ main(int argc, char **argv)
 	LUID logon_id;
 	QUOTA_LIMITS quotas;
 	NTSTATUS status, substatus = 0;
-	int call_package = 0, i, ret = 1;
+	int call_package = 0, openssh_lsa_auth = 0, i, ret = 1;
 
 	memset(&spawn_options, 0, sizeof(spawn_options));
 	spawn_options.use_stdio = 1;
@@ -437,6 +463,8 @@ main(int argc, char **argv)
 			trusted = 0;
 		else if (strcmp(argv[i], "--call-package") == 0)
 			call_package = 1;
+		else if (strcmp(argv[i], "--openssh-lsa-auth") == 0)
+			openssh_lsa_auth = 1;
 		else {
 			usage(argv[0]);
 			return 2;
@@ -447,26 +475,42 @@ main(int argc, char **argv)
 		return 2;
 	}
 	if (package == NULL)
-		package = OPENSSH_LSA_AUTH_PROBE_PACKAGE;
+		package = openssh_lsa_auth ? OPENSSH_LSA_AUTH_PACKAGE :
+		    OPENSSH_LSA_AUTH_PROBE_PACKAGE;
 
 	user_w = utf8_to_utf16(user);
 	domain_w = utf8_to_utf16(domain);
 	if (user_w == NULL || domain_w == NULL)
 		goto done;
-	user_bytes = (wcslen(user_w) + 1) * sizeof(wchar_t);
-	domain_bytes = (wcslen(domain_w) + 1) * sizeof(wchar_t);
-	request_len = sizeof(*request) + user_bytes + domain_bytes;
-	request = (OPENSSH_LSA_AUTH_PROBE_REQUEST *)calloc(1, request_len);
-	if (request == NULL)
-		goto done;
-	request->magic = OPENSSH_LSA_AUTH_PROBE_MAGIC;
-	request->version = OPENSSH_LSA_AUTH_PROBE_VERSION;
-	request->user_bytes = (ULONG)user_bytes;
-	request->domain_bytes = (ULONG)domain_bytes;
-	off = sizeof(*request);
-	memcpy((PBYTE)request + off, user_w, user_bytes);
-	off += user_bytes;
-	memcpy((PBYTE)request + off, domain_w, domain_bytes);
+	if (openssh_lsa_auth) {
+		OPENSSH_LSA_AUTH_REQUEST *auth_request;
+
+		request = build_string_request(sizeof(OPENSSH_LSA_AUTH_REQUEST),
+		    offsetof(OPENSSH_LSA_AUTH_REQUEST, user_bytes),
+		    offsetof(OPENSSH_LSA_AUTH_REQUEST, domain_bytes), user_w,
+		    domain_w, &request_len);
+		if (request == NULL)
+			goto done;
+		auth_request = (OPENSSH_LSA_AUTH_REQUEST *)request;
+		auth_request->magic = OPENSSH_LSA_AUTH_MAGIC;
+		auth_request->version = OPENSSH_LSA_AUTH_VERSION;
+		auth_request->opcode = OPENSSH_LSA_AUTH_OP_CREATE_GRANT;
+	} else {
+		user_bytes = (wcslen(user_w) + 1) * sizeof(wchar_t);
+		domain_bytes = (wcslen(domain_w) + 1) * sizeof(wchar_t);
+		request_len = sizeof(*request) + user_bytes + domain_bytes;
+		request = (OPENSSH_LSA_AUTH_PROBE_REQUEST *)calloc(1, request_len);
+		if (request == NULL)
+			goto done;
+		request->magic = OPENSSH_LSA_AUTH_PROBE_MAGIC;
+		request->version = OPENSSH_LSA_AUTH_PROBE_VERSION;
+		request->user_bytes = (ULONG)user_bytes;
+		request->domain_bytes = (ULONG)domain_bytes;
+		off = sizeof(*request);
+		memcpy((PBYTE)request + off, user_w, user_bytes);
+		off += user_bytes;
+		memcpy((PBYTE)request + off, domain_w, domain_bytes);
+	}
 
 	enable_privilege("SeTcbPrivilege");
 	if (trusted) {
@@ -512,6 +556,33 @@ main(int argc, char **argv)
 		ret = status == STATUS_SUCCESS && substatus == STATUS_SUCCESS ?
 		    0 : 1;
 		goto done;
+	}
+
+	if (openssh_lsa_auth) {
+		OPENSSH_LSA_AUTH_REQUEST *auth_request;
+		OPENSSH_LSA_AUTH_GRANT_REPLY *grant_reply;
+
+		status = LsaCallAuthenticationPackage(lsa, auth_package, request,
+		    (ULONG)request_len, &call_return, &call_return_len,
+		    &substatus);
+		printf("LsaCallAuthenticationPackage package=%s status=0x%08lx "
+		    "protocol=0x%08lx win32=%lu return_len=%lu\n", package,
+		    (unsigned long)status, (unsigned long)substatus,
+		    LsaNtStatusToWinError(status),
+		    (unsigned long)call_return_len);
+		if (status != STATUS_SUCCESS || substatus != STATUS_SUCCESS ||
+		    call_return == NULL ||
+		    call_return_len != sizeof(OPENSSH_LSA_AUTH_GRANT_REPLY))
+			goto done;
+		grant_reply = (OPENSSH_LSA_AUTH_GRANT_REPLY *)call_return;
+		if (grant_reply->magic != OPENSSH_LSA_AUTH_MAGIC ||
+		    grant_reply->version != OPENSSH_LSA_AUTH_VERSION ||
+		    grant_reply->status != STATUS_SUCCESS)
+			goto done;
+		auth_request = (OPENSSH_LSA_AUTH_REQUEST *)request;
+		auth_request->opcode = OPENSSH_LSA_AUTH_OP_REDEEM_GRANT;
+		memcpy(auth_request->grant, grant_reply->grant,
+		    OPENSSH_LSA_AUTH_GRANT_BYTES);
 	}
 
 	memset(&source, 0, sizeof(source));
