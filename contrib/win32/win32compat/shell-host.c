@@ -290,6 +290,7 @@ HANDLE monitor_thread = INVALID_HANDLE_VALUE;
 HANDLE io_thread = INVALID_HANDLE_VALUE;
 HANDLE ux_thread = INVALID_HANDLE_VALUE;
 HANDLE ctrl_thread = INVALID_HANDLE_VALUE;
+HWND child_console_hwnd = NULL;
 
 DWORD child_exit_code = 0;
 DWORD hostProcessId = 0;
@@ -1009,7 +1010,10 @@ ProcessEvent(void *p)
 
 	GetWindowThreadProcessId(hwnd, &dwProcessId); // CodeQL [SM02313]: false positive dwProcessId will not be uninitialized
 
-	if (childProcessId != dwProcessId)
+	if (child_console_hwnd != NULL) {
+		if (hwnd != child_console_hwnd)
+			return ERROR_SUCCESS;
+	} else if (childProcessId != dwProcessId)
 		return ERROR_SUCCESS;
 
 	ZeroMemory(&consoleInfo, sizeof(consoleInfo));
@@ -1466,6 +1470,7 @@ start_with_pty(wchar_t *command)
 
 	FreeConsole();
 	GOTO_CLEANUP_ON_FALSE(AllocConsole());
+	child_console_hwnd = GetConsoleWindow();
 	GOTO_CLEANUP_ON_FALSE(OpenChildConsoleHandles(&sa));
 	SizeWindow(child_out);
 	si.hStdInput = child_in;
@@ -1496,7 +1501,7 @@ start_with_pty(wchar_t *command)
 	 */
 #pragma warning(suppress: 6387)
 	hEventHook = __SetWinEventHook(EVENT_CONSOLE_CARET, EVENT_CONSOLE_END_APPLICATION, NULL,
-					ConsoleEventProc, childProcessId, 0, WINEVENT_OUTOFCONTEXT);
+					ConsoleEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
 	if (hEventHook == NULL)
 		goto cleanup;
 
