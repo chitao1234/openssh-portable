@@ -55,6 +55,88 @@
 extern int in_raw_mode;
 BOOL isFirstTime = TRUE;
 
+static BOOL
+syncio_valid_handle(HANDLE handle)
+{
+	return handle != NULL && handle != INVALID_HANDLE_VALUE;
+}
+
+static DWORD
+syncio_file_type(struct w32_io *pio)
+{
+	if (!syncio_valid_handle(WINHANDLE(pio)))
+		return FILE_TYPE_UNKNOWN;
+	return FILETYPE(pio);
+}
+
+static void
+syncio_close_handle(struct w32_io *pio, DWORD file_type)
+{
+	if (file_type != FILE_TYPE_CHAR && syncio_valid_handle(WINHANDLE(pio))) {
+		CloseHandle(WINHANDLE(pio));
+		WINHANDLE(pio) = INVALID_HANDLE_VALUE;
+	}
+}
+
+static void
+syncio_free(struct w32_io *pio, DWORD file_type)
+{
+	syncio_close_handle(pio, file_type);
+	if (pio->read_details.buf)
+		free(pio->read_details.buf);
+	if (pio->write_details.buf)
+		free(pio->write_details.buf);
+	free(pio);
+}
+
+static BOOL
+syncio_reap_signaled_read_thread(struct w32_io *pio)
+{
+	HANDLE read_thread = pio->read_overlapped.hEvent;
+
+	if (read_thread == NULL)
+		return TRUE;
+	if (WaitForSingleObject(read_thread, 0) != WAIT_OBJECT_0)
+		return FALSE;
+
+	/*
+	 * Prefer the normal completion APC. If the worker exited through the
+	 * interrupt APC, no read APC will arrive, so reap the thread here.
+	 */
+	SleepEx(0, TRUE);
+	if (!pio->read_details.pending)
+		return TRUE;
+
+	CloseHandle(read_thread);
+	pio->read_overlapped.hEvent = NULL;
+	pio->read_details.pending = FALSE;
+	return TRUE;
+}
+
+static BOOL
+syncio_terminate_read_thread(struct w32_io *pio)
+{
+	HANDLE read_thread = pio->read_overlapped.hEvent;
+
+	if (syncio_reap_signaled_read_thread(pio))
+		return TRUE;
+
+	debug4("terminating sync read worker thread, io:%p", pio);
+	if (!TerminateThread(read_thread, 0)) {
+		debug4("TerminateThread failed, error:%d, io:%p", GetLastError(), pio);
+		return FALSE;
+	}
+	if (WaitForSingleObject(read_thread, 1000) != WAIT_OBJECT_0) {
+		debug4("terminated sync read worker did not exit, io:%p", pio);
+		return FALSE;
+	}
+
+	CloseHandle(read_thread);
+	pio->read_overlapped.hEvent = NULL;
+	pio->read_details.pending = FALSE;
+	return TRUE;
+}
+
 /* APC that gets queued on main thread when a sync Read completes on worker thread */
 static VOID CALLBACK
 ReadAPCProc(_In_ ULONG_PTR dwParam)
@@ -74,13 +156,7 @@ ReadAPCProc(_In_ ULONG_PTR dwParam)
 	CloseHandle(pio->read_overlapped.hEvent);
 	pio->read_overlapped.hEvent = 0;
 	if (pio->close_after_read) {
-		if (FILETYPE(pio) != FILE_TYPE_CHAR)
-			CloseHandle(WINHANDLE(pio));
-		if (pio->read_details.buf)
-			free(pio->read_details.buf);
-		if (pio->write_details.buf)
-			free(pio->write_details.buf);
-		free(pio);
+		syncio_free(pio, syncio_file_type(pio));
 	}
 }
 
@@ -303,8 +379,11 @@ int
 syncio_close(struct w32_io* pio)
 {
 	int should_defer_free = 0;
+	DWORD file_type = FILE_TYPE_UNKNOWN;
+	BOOL can_cancel_cross_thread;
 
 	debug4("syncio_close - pio:%p", pio);
+	can_cancel_cross_thread = pIsWindowsVistaOrGreater();
 
 	/*
 	* Wait for io write operation that is called by worker thread to terminate
@@ -321,45 +400,50 @@ syncio_close(struct w32_io* pio)
 		SleepEx(0, TRUE);
 	}
 
-	pCancelIoEx(WINHANDLE(pio), NULL);
+	if (can_cancel_cross_thread)
+		pCancelIoEx(WINHANDLE(pio), NULL);
 
 	/* If io is pending, let worker threads exit. */
 	if (pio->read_details.pending) {
 		/*
-		Terminate the read thread at the below situations:
-		1. For console - the read thread is blocked by the while loop on raw mode
-		2. Function ReadFile on Win7 machine dees not return when no content to read in non-interactive mode.
+		* CancelIoEx/CancelSynchronousIo handle Vista+ cross-thread
+		* cancellation. XP has neither; even GetFileType/CloseHandle can
+		* block behind the pending synchronous read, so terminate this
+		* dedicated worker before touching the underlying handle.
 		*/
-			if (FILETYPE(pio) == FILE_TYPE_CHAR && (IsWin7OrLess() || in_raw_mode)) {
-				QueueUserAPC(InterruptThread, pio->read_overlapped.hEvent, (ULONG_PTR)NULL);
-				if (!pCancelSynchronousIo(pio->read_overlapped.hEvent) &&
-				    GetLastError() == ERROR_CALL_NOT_IMPLEMENTED)
-					should_defer_free = 1;
-			}
+		if (can_cancel_cross_thread) {
+			QueueUserAPC(InterruptThread, pio->read_overlapped.hEvent, (ULONG_PTR)NULL);
+			pCancelSynchronousIo(pio->read_overlapped.hEvent);
+		} else if (!syncio_terminate_read_thread(pio))
+			should_defer_free = 1;
 
 		// give the read thread some time to wind down, but don't block syncio_close
-		if (!should_defer_free &&
+		if (!should_defer_free && pio->read_details.pending &&
 		    WAIT_TIMEOUT == WaitForSingleObject(pio->read_overlapped.hEvent, 1000)) {
 			debug4("read_overlapped thread timed out");
-			should_defer_free = 1;
+			if (!can_cancel_cross_thread &&
+			    syncio_terminate_read_thread(pio))
+				should_defer_free = 0;
+			else
+				should_defer_free = 1;
 		}
+	}
+
+	if (should_defer_free) {
+		pio->close_after_read = TRUE;
+		/* drain queued APCs after transferring cleanup ownership */
+		SleepEx(0, TRUE);
+		return 0;
 	}
 
 	/* drain queued APCs */
 	SleepEx(0, TRUE);
 
-	if (should_defer_free) {
-		pio->close_after_read = TRUE;
-		return 0;
-	}
+	if (pio->read_details.pending)
+		syncio_reap_signaled_read_thread(pio);
 
 	/* TODO - fix this, closing Console handles is interfering with TTY/PTY rendering */
-	if (FILETYPE(pio) != FILE_TYPE_CHAR)
-		CloseHandle(WINHANDLE(pio));
-	if (pio->read_details.buf)
-		free(pio->read_details.buf);
-	if (pio->write_details.buf)
-		free(pio->write_details.buf);
-	free(pio);
+	file_type = syncio_file_type(pio);
+	syncio_free(pio, file_type);
 	return 0;
 }
