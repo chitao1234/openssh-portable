@@ -80,6 +80,8 @@ iocp_work(LPVOID lpParam)
 	ULONG_PTR completion_key = 0;
 	OVERLAPPED *p_ol;
 	while (1) {
+		if (ioc_port == NULL)
+			return 0;
 		con = NULL;
 		p_ol = NULL;
 		if (GetQueuedCompletionStatus(ioc_port, &bytes, &completion_key, &p_ol,
@@ -94,6 +96,8 @@ iocp_work(LPVOID lpParam)
 			con = (struct agent_connection *)completion_key;
 			agent_connection_on_io(con, bytes, p_ol);
 		}
+		if (ioc_port == NULL)
+			return 0;
 	}
 }
 
@@ -101,6 +105,7 @@ static void
 agent_listen_loop() 
 {
 	DWORD  r;
+	DWORD pipe_mode;
 	HANDLE wait_events[2];
 
 	wait_events[0] = event_stop_agent;
@@ -119,15 +124,15 @@ agent_listen_loop()
 		fatal("cannot convert sddl ERROR:%d", GetLastError());
 
 	sa.bInheritHandle = FALSE;
+	pipe_mode = PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT;
+	if (pIsWindowsVistaOrGreater())
+		pipe_mode |= PIPE_REJECT_REMOTE_CLIENTS;
 
 	while (1) {
 		listener_pipe = CreateNamedPipeW(
 			AGENT_PIPE_ID,		  // pipe name 
 			PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,       // read/write access 
-			PIPE_TYPE_BYTE |       // message type pipe 
-			PIPE_READMODE_BYTE |   // message-read mode 
-			PIPE_REJECT_REMOTE_CLIENTS | // no remote client connections allowed
-			PIPE_WAIT,                // blocking mode 
+			pipe_mode,
 			PIPE_UNLIMITED_INSTANCES, // max. instances  
 			BUFSIZE,                  // output buffer size 
 			BUFSIZE,                  // input buffer size 
