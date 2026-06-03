@@ -275,6 +275,7 @@ BOOL bStartup = TRUE;
 BOOL bHookEvents = FALSE;
 BOOL bFullScreen = FALSE;
 BOOL bUseAnsiEmulation = TRUE;
+BOOL bConsoleOutputSeen = FALSE;
 
 HANDLE child_out = INVALID_HANDLE_VALUE;
 HANDLE child_in = INVALID_HANDLE_VALUE;
@@ -770,8 +771,74 @@ SendBuffer(HANDLE hInput, CHAR_INFO *buffer, DWORD bufferSize)
 	if (bufferSize <= 0)
 		return;
 
+	bConsoleOutputSeen = TRUE;
 	for (DWORD i = 0; i < bufferSize; i++)
 		SendCharacter(hInput, buffer[i].Attributes, buffer[i].Char.UnicodeChar);
+}
+
+void
+SendConsoleSnapshot(HANDLE hInput)
+{
+	CONSOLE_SCREEN_BUFFER_INFOEX  consoleBufferInfo;
+	CHAR_INFO *buffer = NULL;
+	SMALL_RECT readRect;
+	COORD coordBufSize;
+	COORD coordBufCoord;
+	SHORT row, top, bottom, width, last;
+
+	if (bConsoleOutputSeen || child_out == INVALID_HANDLE_VALUE ||
+	    child_out == NULL)
+		return;
+
+	ZeroMemory(&consoleBufferInfo, sizeof(consoleBufferInfo));
+	consoleBufferInfo.cbSize = sizeof(consoleBufferInfo);
+	if (!pGetConsoleScreenBufferInfoEx(child_out, &consoleBufferInfo))
+		return;
+
+	width = consoleBufferInfo.srWindow.Right -
+	    consoleBufferInfo.srWindow.Left + 1;
+	if (width <= 0 || width > MAX_CONSOLE_COLUMNS)
+		return;
+
+	top = consoleBufferInfo.srWindow.Top;
+	bottom = min(consoleBufferInfo.srWindow.Bottom,
+	    consoleBufferInfo.dwCursorPosition.Y);
+	if (bottom < top)
+		return;
+
+	buffer = calloc(width, sizeof(*buffer));
+	if (buffer == NULL)
+		return;
+
+	coordBufSize.X = width;
+	coordBufSize.Y = 1;
+	coordBufCoord.X = 0;
+	coordBufCoord.Y = 0;
+
+	for (row = top; row <= bottom; row++) {
+		readRect.Left = consoleBufferInfo.srWindow.Left;
+		readRect.Right = consoleBufferInfo.srWindow.Right;
+		readRect.Top = row;
+		readRect.Bottom = row;
+
+		ZeroMemory(buffer, width * sizeof(*buffer));
+		if (!ReadConsoleOutput(child_out, buffer, coordBufSize,
+		    coordBufCoord, &readRect))
+			continue;
+
+		last = width - 1;
+		while (last >= 0 &&
+		    (buffer[last].Char.UnicodeChar == L'\0' ||
+		    buffer[last].Char.UnicodeChar == L' '))
+			last--;
+		if (last < 0)
+			continue;
+
+		SendSetCursor(hInput, 1, row - top + 1);
+		SendBuffer(hInput, buffer, last + 1);
+	}
+
+	free(buffer);
 }
 
 void 
@@ -1236,6 +1303,41 @@ cleanup:
 	return 0;
 }
 
+BOOL
+OpenChildConsoleHandles(SECURITY_ATTRIBUTES *sa)
+{
+	if (IS_INVALID_HANDLE(child_in)) {
+		child_in = CreateFile(TEXT("CONIN$"), GENERIC_READ | GENERIC_WRITE,
+		    FILE_SHARE_WRITE | FILE_SHARE_READ, sa, OPEN_EXISTING, 0, NULL);
+		if (IS_INVALID_HANDLE(child_in))
+			return FALSE;
+	}
+
+	if (IS_INVALID_HANDLE(child_out)) {
+		child_out = CreateFile(TEXT("CONOUT$"), GENERIC_READ | GENERIC_WRITE,
+		    FILE_SHARE_WRITE | FILE_SHARE_READ, sa, OPEN_EXISTING, 0, NULL);
+		if (IS_INVALID_HANDLE(child_out))
+			return FALSE;
+	}
+
+	child_err = child_out;
+	return TRUE;
+}
+
+void
+CloseChildConsoleHandles(void)
+{
+	if (!IS_INVALID_HANDLE(child_in)) {
+		CloseHandle(child_in);
+		child_in = INVALID_HANDLE_VALUE;
+	}
+	if (!IS_INVALID_HANDLE(child_out)) {
+		CloseHandle(child_out);
+		child_out = INVALID_HANDLE_VALUE;
+	}
+	child_err = INVALID_HANDLE_VALUE;
+}
+
 void CALLBACK 
 ConsoleEventProc(HWINEVENTHOOK hWinEventHook,
     DWORD event,
@@ -1259,20 +1361,9 @@ ProcessMessages(void* p)
 	sa.lpSecurityDescriptor = NULL;
 	sa.bInheritHandle = TRUE;
 
-	/* If we here then we are certain that we have a child process console, so we should be able to get child_in, child_out handles */
-	while (child_in == (HANDLE)-1) {
-		child_in = CreateFile(TEXT("CONIN$"), GENERIC_READ | GENERIC_WRITE,
-					FILE_SHARE_WRITE | FILE_SHARE_READ,
-					&sa, OPEN_EXISTING, 0, NULL);
-	}
+	if (!OpenChildConsoleHandles(&sa))
+		goto cleanup;
 
-	while (child_out == (HANDLE)-1) {
-		child_out = CreateFile(TEXT("CONOUT$"), GENERIC_READ | GENERIC_WRITE,
-					FILE_SHARE_WRITE | FILE_SHARE_READ,
-					&sa, OPEN_EXISTING, 0, NULL);
-	}
-
-	child_err = child_out;
 	SizeWindow(child_out);
 	/* Get the current buffer information after all the adjustments */
 	pGetConsoleScreenBufferInfoEx(child_out, &consoleInfo);
@@ -1286,12 +1377,11 @@ ProcessMessages(void* p)
 		}
 	}
 
+cleanup:
 	/* cleanup */
 	dwStatus = GetLastError();
-	if (child_in != INVALID_HANDLE_VALUE)
-		CloseHandle(child_in);
-	if (child_out != INVALID_HANDLE_VALUE)
-		CloseHandle(child_out);
+	SendConsoleSnapshot(pipe_out);
+	CloseChildConsoleHandles();
 }
 
 int 
@@ -1303,9 +1393,13 @@ start_with_pty(wchar_t *command)
 	SECURITY_ATTRIBUTES sa;
 	BOOL ret;
 	DWORD dwStatus;
+	HANDLE pipe_in_saved = INVALID_HANDLE_VALUE;
+	HANDLE pipe_out_saved = INVALID_HANDLE_VALUE;
+	HANDLE pipe_ctrl_saved = INVALID_HANDLE_VALUE;
 	HANDLE hEventHook = NULL;
 	HMODULE hm_kernel32 = NULL, hm_user32 = NULL;
 	wchar_t kernel32_dll_path[PATH_MAX]={0,}, user32_dll_path[PATH_MAX]={0,};
+	MSG msg;
 
 	if (cmd == NULL) {
 		printf_s("ssh-shellhost is out of memory");
@@ -1336,6 +1430,9 @@ start_with_pty(wchar_t *command)
 	pipe_in = GetStdHandle(STD_INPUT_HANDLE);
 	pipe_out = GetStdHandle(STD_OUTPUT_HANDLE);
 	pipe_ctrl = GetStdHandle(STD_ERROR_HANDLE);
+	pipe_in_saved = pipe_in;
+	pipe_out_saved = pipe_out;
+	pipe_ctrl_saved = pipe_ctrl;
 
 	/* copy pipe handles passed through std io*/
 	if ((pipe_in == INVALID_HANDLE_VALUE) || (pipe_out == INVALID_HANDLE_VALUE) || (pipe_ctrl == INVALID_HANDLE_VALUE))
@@ -1352,49 +1449,60 @@ start_with_pty(wchar_t *command)
 	ZeroMemory(&inputSi, sizeof(STARTUPINFOW));
 	GetStartupInfoW(&inputSi);
 	memset(&sa, 0, sizeof(SECURITY_ATTRIBUTES));
+	sa.nLength = sizeof(SECURITY_ATTRIBUTES);
 	sa.bInheritHandle = TRUE;
 	/* WM_APPEXIT */
 	hostThreadId = GetCurrentThreadId();
 	hostProcessId = GetCurrentProcessId();
 	InitializeCriticalSection(&criticalSection);
-	
-	/* 
-	 * Ignore the static code analysis warning C6387 
-	 * as per msdn, third argument can be NULL when we specify WINEVENT_OUTOFCONTEXT
-	 */
-#pragma warning(suppress: 6387)
-	hEventHook = __SetWinEventHook(EVENT_CONSOLE_CARET, EVENT_CONSOLE_END_APPLICATION, NULL,
-					ConsoleEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
+
 	memset(&si, 0, sizeof(STARTUPINFOW));
 	memset(&pi, 0, sizeof(PROCESS_INFORMATION));
 	/* Copy our parent buffer sizes */
 	si.cb = sizeof(STARTUPINFOW);
-	si.dwFlags = 0;
+	si.dwFlags = STARTF_USESTDHANDLES;
 	/* disable inheritance on pipe_in*/
 	GOTO_CLEANUP_ON_FALSE(SetHandleInformation(pipe_in, HANDLE_FLAG_INHERIT, 0));
-	
+
+	FreeConsole();
+	GOTO_CLEANUP_ON_FALSE(AllocConsole());
+	GOTO_CLEANUP_ON_FALSE(OpenChildConsoleHandles(&sa));
+	SizeWindow(child_out);
+	si.hStdInput = child_in;
+	si.hStdOutput = child_out;
+	si.hStdError = child_out;
+	SetStdHandle(STD_INPUT_HANDLE, child_in);
+	SetStdHandle(STD_OUTPUT_HANDLE, child_out);
+	SetStdHandle(STD_ERROR_HANDLE, child_out);
+
 	/*
 	* Launch via cmd.exe /c, otherwise known issues exist with color rendering in powershell
 	*/
 	_snwprintf_s(cmd, MAX_CMD_LEN, MAX_CMD_LEN, L"\"%ls\\cmd.exe\" /c \"%ls\"", system32_path, command);
 
 	SetConsoleCtrlHandler(NULL, FALSE);
-	GOTO_CLEANUP_ON_FALSE(CreateProcessW(NULL, cmd, NULL, NULL, TRUE, CREATE_NEW_CONSOLE,
+	GOTO_CLEANUP_ON_FALSE(CreateProcessW(NULL, cmd, NULL, NULL, TRUE, CREATE_SUSPENDED,
 				NULL, NULL, &si, &pi));
 	childProcessId = pi.dwProcessId;
+	child = pi.hProcess;
 
-	FreeConsole();
-	Sleep(20);
-	while (!AttachConsole(pi.dwProcessId)) {
-		/* If user tries to execute a command (like dir) in pty session then we may run into this scenario. */
-		if (GetExitCodeProcess(pi.hProcess, &child_exit_code) && child_exit_code != STILL_ACTIVE)
-			goto cleanup;
+	SetStdHandle(STD_INPUT_HANDLE, pipe_in_saved);
+	SetStdHandle(STD_OUTPUT_HANDLE, pipe_out_saved);
+	SetStdHandle(STD_ERROR_HANDLE, pipe_ctrl_saved);
 
-		Sleep(100);
-	}
+	/*
+	 * Ignore the static code analysis warning C6387
+	 * as per msdn, third argument can be NULL when we specify WINEVENT_OUTOFCONTEXT
+	 */
+#pragma warning(suppress: 6387)
+	hEventHook = __SetWinEventHook(EVENT_CONSOLE_CARET, EVENT_CONSOLE_END_APPLICATION, NULL,
+					ConsoleEventProc, childProcessId, 0, WINEVENT_OUTOFCONTEXT);
+	if (hEventHook == NULL)
+		goto cleanup;
+
+	PeekMessage(&msg, NULL, WM_USER, WM_USER, PM_NOREMOVE);
 
 	/* monitor child exist */
-	child = pi.hProcess;
 	monitor_thread = (HANDLE) _beginthreadex(NULL, 0, MonitorChild, NULL, 0, NULL);
 	if (IS_INVALID_HANDLE(monitor_thread))
 		goto cleanup;
@@ -1416,9 +1524,15 @@ start_with_pty(wchar_t *command)
 	if (IS_INVALID_HANDLE(ctrl_thread))
 		goto cleanup;
 
+	if (ResumeThread(pi.hThread) == (DWORD)-1)
+		goto cleanup;
+
 	ProcessMessages(NULL);
 cleanup:
 	dwStatus = GetLastError();
+	SetStdHandle(STD_INPUT_HANDLE, pipe_in_saved);
+	SetStdHandle(STD_OUTPUT_HANDLE, pipe_out_saved);
+	SetStdHandle(STD_ERROR_HANDLE, pipe_ctrl_saved);
 	if (child != INVALID_HANDLE_VALUE)
 		TerminateProcess(child, 0);
 
@@ -1442,7 +1556,8 @@ cleanup:
 
 	if (hEventHook)
 		__UnhookWinEvent(hEventHook);
-	
+
+	CloseChildConsoleHandles();
 	FreeConsole();
 	
 	if (child != INVALID_HANDLE_VALUE) {
