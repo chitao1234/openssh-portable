@@ -705,6 +705,7 @@ LsaApLogonUser(PLSA_CLIENT_REQUEST client_request,
 	USER_INFO_4 *user_info = NULL;
 	NTSTATUS status = STATUS_LOGON_FAILURE;
 	NET_API_STATUS net_status;
+	int logon_session_created = 0;
 
 	(void)client_request;
 	(void)client_authentication_base;
@@ -782,10 +783,23 @@ LsaApLogonUser(PLSA_CLIENT_REQUEST client_request,
 		status = STATUS_INSUFFICIENT_RESOURCES;
 		goto done;
 	}
-	if (logon_id != NULL && AllocateLocallyUniqueId(logon_id) == FALSE) {
+	if (logon_id == NULL || lsa_dispatch == NULL ||
+	    lsa_dispatch->CreateLogonSession == NULL) {
+		status = STATUS_INVALID_PARAMETER;
+		goto done;
+	}
+	if (AllocateLocallyUniqueId(logon_id) == FALSE) {
 		status = STATUS_INSUFFICIENT_RESOURCES;
 		goto done;
 	}
+	status = lsa_dispatch->CreateLogonSession(logon_id);
+	if (status != STATUS_SUCCESS) {
+		tracef("CreateLogonSession failed: 0x%08lx luid=%lu:%ld",
+		    (unsigned long)status, logon_id->LowPart,
+		    logon_id->HighPart);
+		goto done;
+	}
+	logon_session_created = 1;
 	if (sub_status != NULL)
 		*sub_status = STATUS_SUCCESS;
 	tracef("LogonUser returning STATUS_SUCCESS");
@@ -809,6 +823,9 @@ done:
 			lsa_free(*authenticating_authority);
 			*authenticating_authority = NULL;
 		}
+		if (logon_session_created && lsa_dispatch != NULL &&
+		    lsa_dispatch->DeleteLogonSession != NULL)
+			lsa_dispatch->DeleteLogonSession(logon_id);
 		tracef("LogonUser returning failure: 0x%08lx",
 		    (unsigned long)status);
 	}
