@@ -91,7 +91,7 @@ run_child(const char *mode)
 		    "--user xpuser --domain . --cwd C:\\chi "
 		    "--create-flags no-window --stdio-file "
 		    "C:\\chi\\lsa-token-child.out --cmd "
-		    "\"cmd /c echo TOKEN_OK && set USERNAME\"";
+		    "\"cmd /c echo TOKEN_OK\"";
 	else if (mode != NULL && strcmp(mode, "openssh-lsa-auth-untrusted") == 0)
 		cmd = "C:\\chi\\win32-lsa-auth-probe.exe --openssh-lsa-auth "
 		    "--user xpuser --domain . --untrusted";
