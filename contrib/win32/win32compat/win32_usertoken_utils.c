@@ -869,6 +869,7 @@ done:
 		free(user_utf16);
 	if (pwd_utf16)
 		SecureZeroMemory(pwd_utf16, sizeof(wchar_t) * wcslen(pwd_utf16));
+	free(pwd_utf16);
 
 	return (password_auth_token) ? 1 : 0;
 

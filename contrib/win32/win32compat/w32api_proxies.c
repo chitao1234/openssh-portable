@@ -780,21 +780,35 @@ pLogonUserExExW(wchar_t *user_name, wchar_t *domain, wchar_t *password, DWORD lo
 {
 	HMODULE hm = NULL;
 
-	typedef BOOL(WINAPI *LogonUserExExWType)(wchar_t*, wchar_t*, wchar_t*, DWORD, DWORD, PTOKEN_GROUPS, PHANDLE, PSID, PVOID, LPDWORD, PQUOTA_LIMITS);
+	typedef BOOL(WINAPI *LogonUserExExWType)(wchar_t*, wchar_t*, wchar_t*, DWORD, DWORD, PTOKEN_GROUPS, PHANDLE, PSID *, PVOID *, LPDWORD, PQUOTA_LIMITS);
 	static LogonUserExExWType s_pLogonUserExExW = NULL;
+	static int s_resolved = 0;
 
-	if (!s_pLogonUserExExW) {
+	if (!s_resolved) {
+		s_resolved = 1;
 		/* this API is typically found in sspicli, but this dll doesn't exist on some downlevel machines - we fallback to advapi32 then */
 		if ((hm = load_sspicli()) == NULL &&
 		    (hm = load_advapi32()) == NULL)
-			return FALSE;
+			goto fallback;
 
 		if ((s_pLogonUserExExW = (LogonUserExExWType)get_proc_address(hm, "LogonUserExExW")) == NULL)
-			return FALSE;
+			goto fallback;
 	}
 
-	return s_pLogonUserExExW(user_name, domain, password, logon_type, logon_provider,
+	if (s_pLogonUserExExW != NULL)
+		return s_pLogonUserExExW(user_name, domain, password, logon_type, logon_provider,
 			token_groups, token, logon_sid, profile_buffer, profile_length, quota_limits);
+
+fallback:
+	if (token_groups != NULL || logon_sid != NULL ||
+	    profile_buffer != NULL || profile_length != NULL ||
+	    quota_limits != NULL || logon_provider == LOGON32_PROVIDER_VIRTUAL) {
+		SetLastError(ERROR_PROC_NOT_FOUND);
+		return FALSE;
+	}
+
+	return LogonUserW(user_name, domain, password, logon_type,
+	    logon_provider, token);
 }
 
 
