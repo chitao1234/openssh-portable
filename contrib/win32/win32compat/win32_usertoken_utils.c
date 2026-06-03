@@ -313,6 +313,7 @@ done:
 
 HANDLE generate_sshd_virtual_token();
 HANDLE generate_sshd_token_as_nonsystem();
+HANDLE generate_sshd_restricted_process_token();
 
 HANDLE
 get_user_token(const char* user, int impersonation) {
@@ -330,8 +331,11 @@ get_user_token(const char* user, int impersonation) {
 		if (!am_system() && (token = generate_sshd_token_as_nonsystem()) != 0)
 			goto done;
 			
-		if ((token = generate_sshd_virtual_token()) == 0)
-  		    error("%s - unable to generate sshd virtual token, ensure sshd service has TCB privileges", __func__);
+		if ((token = generate_sshd_virtual_token()) == 0 &&
+		    !pIsWindowsVistaOrGreater())
+			token = generate_sshd_restricted_process_token();
+		if (token == 0)
+			error("%s - unable to generate sshd token, ensure sshd service has TCB privileges", __func__);
 
 		goto done;
 	}
@@ -564,6 +568,27 @@ HANDLE generate_sshd_token_as_nonsystem()
 	HANDLE token = 0;
 	OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS_P , &token);
 	return token;
+}
+
+HANDLE
+generate_sshd_restricted_process_token()
+{
+	HANDLE process_token = NULL, restricted_token = NULL;
+
+	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS_P,
+	    &process_token)) {
+		debug3("%s: OpenProcessToken failed with %d", __func__,
+		    GetLastError());
+		return NULL;
+	}
+
+	if (!CreateRestrictedToken(process_token, DISABLE_MAX_PRIVILEGE,
+	    0, NULL, 0, NULL, 0, NULL, &restricted_token))
+		debug3("%s: CreateRestrictedToken failed with %d", __func__,
+		    GetLastError());
+
+	CloseHandle(process_token);
+	return restricted_token;
 }
 
 HANDLE generate_sshd_virtual_token()

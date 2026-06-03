@@ -57,6 +57,109 @@ static int ngroups;
 static char **groups_byname;
 static char *user_name;
 static HANDLE user_token;
+static int groups_processed;
+
+static int
+append_group_name(char ***groups, int *num_groups, int *allocated,
+    const wchar_t *group_name)
+{
+	wchar_t group_name_lc[DNLEN + 1 + GNLEN + 1];
+	char **tmp, *utf8_group_name;
+
+	if (swprintf_s(group_name_lc, ARRAYSIZE(group_name_lc), L"%s",
+	    group_name) == -1) {
+		errno = ENOMEM;
+		return -1;
+	}
+	_wcslwr_s(group_name_lc, ARRAYSIZE(group_name_lc));
+	if ((utf8_group_name = utf16_to_utf8(group_name_lc)) == NULL) {
+		errno = ENOMEM;
+		return -1;
+	}
+
+	if (*num_groups >= *allocated) {
+		int new_allocated = *allocated == 0 ? 8 : *allocated * 2;
+		tmp = realloc(*groups, sizeof(char *) * new_allocated);
+		if (tmp == NULL) {
+			free(utf8_group_name);
+			errno = ENOMEM;
+			return -1;
+		}
+		*groups = tmp;
+		*allocated = new_allocated;
+	}
+
+	debug3("Added group '%s' for user %s", utf8_group_name, user_name);
+	(*groups)[(*num_groups)++] = utf8_group_name;
+	return 0;
+}
+
+static int
+get_user_groups_by_name()
+{
+	wchar_t *user_utf16 = NULL, *lookup_user = NULL, *separator;
+	LOCALGROUP_USERS_INFO_0 *local_groups = NULL;
+	GROUP_USERS_INFO_0 *global_groups = NULL;
+	DWORD entries = 0, total = 0, i;
+	NET_API_STATUS status;
+	char **user_groups = NULL;
+	int ret = -1, num_groups = 0, allocated = 0;
+
+	if ((user_utf16 = utf8_to_utf16(user_name)) == NULL) {
+		errno = ENOMEM;
+		goto cleanup;
+	}
+	lookup_user = user_utf16;
+	if ((separator = wcschr(user_utf16, L'\\')) != NULL)
+		lookup_user = separator + 1;
+
+	status = NetUserGetLocalGroups(NULL, lookup_user, 0,
+	    LG_INCLUDE_INDIRECT, (LPBYTE *)&local_groups, MAX_PREFERRED_LENGTH,
+	    &entries, &total);
+	if (status == NERR_Success) {
+		for (i = 0; i < entries; i++) {
+			if (append_group_name(&user_groups, &num_groups,
+			    &allocated, local_groups[i].lgrui0_name) != 0)
+				goto cleanup;
+		}
+	} else {
+		debug3("%s: NetUserGetLocalGroups() failed for %ls with %lu",
+		    __func__, lookup_user, status);
+	}
+
+	entries = total = 0;
+	status = NetUserGetGroups(NULL, lookup_user, 0,
+	    (LPBYTE *)&global_groups, MAX_PREFERRED_LENGTH, &entries, &total);
+	if (status == NERR_Success) {
+		for (i = 0; i < entries; i++) {
+			if (append_group_name(&user_groups, &num_groups,
+			    &allocated, global_groups[i].grui0_name) != 0)
+				goto cleanup;
+		}
+	} else {
+		debug3("%s: NetUserGetGroups() failed for %ls with %lu",
+		    __func__, lookup_user, status);
+	}
+
+	ngroups = num_groups;
+	groups_byname = user_groups;
+	user_groups = NULL;
+	ret = 0;
+
+cleanup:
+	if (local_groups)
+		NetApiBufferFree(local_groups);
+	if (global_groups)
+		NetApiBufferFree(global_groups);
+	if (user_groups) {
+		for (i = 0; i < (DWORD)num_groups; i++)
+			free(user_groups[i]);
+		free(user_groups);
+	}
+	if (user_utf16)
+		free(user_utf16);
+	return ret;
+}
 
 /*
 * This method will fetch all the groups (listed below) even if the user is indirectly a member.
@@ -72,10 +175,14 @@ get_user_groups()
 	HANDLE logon_token = user_token;
 	PTOKEN_GROUPS group_buf = NULL;
 	int ret = -1, num_groups = 0;
-	static int processed = 0;
 
-	if (processed)
+	if (groups_processed)
 		return 0;
+	if (logon_token == NULL) {
+		ret = get_user_groups_by_name();
+		groups_processed = 1;
+		return ret;
+	}
 
 	/* initialize return values */
 	errno = 0;
@@ -177,7 +284,7 @@ cleanup:
 	}
 
 	debug2("%s: done extracting all groups of user %s", __func__, user_name);
-	processed = 1;
+	groups_processed = 1;
 	return ret;
 }
 
@@ -220,8 +327,19 @@ check_group_membership(const char* group)
 		goto cleanup;
 	}
 	
-	if (!CheckTokenMembership(user_token, sid, &is_member))
-		fatal("%s CheckTokenMembership for user %s failed with %d for group %s", __func__, user_name, GetLastError(), group);
+	if (user_token != NULL) {
+		if (!CheckTokenMembership(user_token, sid, &is_member))
+			fatal("%s CheckTokenMembership for user %s failed with %d for group %s", __func__, user_name, GetLastError(), group);
+	} else {
+		if (get_user_groups() == -1)
+			fatal("unable to retrieve group info for user %s", user_name);
+		for (int i = 0; i < ngroups; i++) {
+			if (strcasecmp(groups_byname[i], group) == 0) {
+				is_member = 1;
+				break;
+			}
+		}
+	}
 
 cleanup:
 	if (sid)
@@ -244,10 +362,17 @@ ga_init(const char *user, gid_t base)
 	ngroups = 0;
 	groups_byname = NULL;
 	user_token = NULL;
+	groups_processed = 0;
 
 	user_name = xstrdup(user);
 
 	if ((user_token = get_user_token(user_name, 0)) == NULL) {
+		PSID user_sid;
+
+		if ((user_sid = get_sid(user_name)) != NULL) {
+			free(user_sid);
+			return 1;
+		}
 		/*
 		 * No fatal call here so experience when called by servconf parsing Match block
 		 * is consistent for an invalid user (does not find password, but is not fatal yet)
@@ -354,6 +479,8 @@ ga_free(void)
 	if (user_name)
 		free(user_name);
 	user_name = NULL;
-	CloseHandle(user_token);
+	if (user_token)
+		CloseHandle(user_token);
 	user_token = NULL;
+	groups_processed = 0;
 }

@@ -173,6 +173,79 @@ generate_host_keys()
 	}
 }
 
+static void
+set_privilege(const wchar_t *privilege, BOOL enable)
+{
+	HANDLE token = NULL;
+	TOKEN_PRIVILEGES tp;
+	LUID luid;
+
+	if (!OpenProcessToken(GetCurrentProcess(),
+	    TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token))
+		return;
+	if (!LookupPrivilegeValueW(NULL, privilege, &luid))
+		goto done;
+
+	memset(&tp, 0, sizeof(tp));
+	tp.PrivilegeCount = 1;
+	tp.Privileges[0].Luid = luid;
+	tp.Privileges[0].Attributes = enable ? SE_PRIVILEGE_ENABLED : 0;
+	AdjustTokenPrivileges(token, FALSE, &tp, sizeof(tp), NULL, NULL);
+
+done:
+	CloseHandle(token);
+}
+
+static void
+repair_host_private_key_file_permissions(const wchar_t *path)
+{
+	PSECURITY_DESCRIPTOR sd = NULL;
+	DWORD attrs;
+
+	attrs = GetFileAttributesW(path);
+	if (attrs == INVALID_FILE_ATTRIBUTES || (attrs & FILE_ATTRIBUTE_DIRECTORY))
+		return;
+
+	if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
+	    L"O:BAG:SYD:P(A;;FA;;;SY)(A;;FA;;;BA)", SDDL_REVISION_1,
+	    &sd, NULL)) {
+		printf("cannot convert host key sddl ERROR:%d", GetLastError());
+		return;
+	}
+
+	set_privilege(L"SeRestorePrivilege", TRUE);
+	set_privilege(L"SeTakeOwnershipPrivilege", TRUE);
+	if (!SetFileSecurityW(path,
+	    OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION, sd))
+		printf("failed to repair %S permissions, error:%d", path,
+		    GetLastError());
+	set_privilege(L"SeTakeOwnershipPrivilege", FALSE);
+	set_privilege(L"SeRestorePrivilege", FALSE);
+
+	LocalFree(sd);
+}
+
+static void
+repair_host_private_key_permissions()
+{
+	static const wchar_t *host_private_keys[] = {
+		L"ssh_host_dsa_key",
+		L"ssh_host_ecdsa_key",
+		L"ssh_host_ed25519_key",
+		L"ssh_host_rsa_key",
+		L"ssh_host_xmss_key",
+	};
+	wchar_t path[PATH_MAX];
+	size_t i;
+
+	for (i = 0; i < _countof(host_private_keys); i++) {
+		if (swprintf_s(path, _countof(path), L"%s\\ssh\\%s",
+		    __wprogdata, host_private_keys[i]) == -1)
+			continue;
+		repair_host_private_key_file_permissions(path);
+	}
+}
+
 /*
 * 1) Create %programdata%\ssh - Administrator group(F), system(F), authorized users(RX).
 * 2) Create %programdata%\ssh\logs - Administrator group(F), system(F)
@@ -244,6 +317,7 @@ prereq_setup()
 {
 	create_prgdata_ssh_folder();
 	generate_host_keys();
+	repair_host_private_key_permissions();
 	create_openssh_registry_key();
 }
 
@@ -314,11 +388,13 @@ int wmain(int argc, wchar_t **wargv) {
 			free(path_value);
 	}
 
-	if (!launched_by_service_control_manager())
+	if (!launched_by_service_control_manager()) {
 		return sshd_main(argc, wargv);
+	}
 
 	if (!StartServiceCtrlDispatcherW(dispatch_table)) {
-		if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
+		DWORD gle = GetLastError();
+		if (gle == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
 			return sshd_main(argc, wargv); /* sshd running NOT as service*/
 		else
 			return -1;
