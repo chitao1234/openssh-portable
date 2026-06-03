@@ -7,8 +7,9 @@
  *       ../openssh-portable/regress/misc/win32-lsa-auth-probe.c \
  *       -ladvapi32 -lsecur32
  *
- * The matching package intentionally returns STATUS_LOGON_FAILURE. A useful
- * XP result is a client-side failure plus an LSASS-side trace in:
+ * The matching package returns a diagnostic local-user token when LSASS
+ * accepts the probe request. A useful XP result is a returned token plus an
+ * LSASS-side trace in:
  *   C:\chi\win32-lsa-auth-package-probe.log
  */
 #ifndef _WIN32_WINNT
