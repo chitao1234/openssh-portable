@@ -56,25 +56,11 @@ trace_line(const char *msg, ULONG value)
 	CloseHandle(h);
 }
 
-BOOL WINAPI
-DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
-{
-	(void)instance;
-	(void)reason;
-	(void)reserved;
-	return TRUE;
-}
-
-NTSTATUS NTAPI
-Msv1_0SubAuthenticationRoutine(NETLOGON_LOGON_INFO_CLASS logon_level,
-    PVOID logon_information, ULONG flags, PUSER_ALL_INFORMATION user_all,
-    PULONG which_fields, PULONG user_flags, PBOOLEAN authoritative,
+static NTSTATUS
+accept_subauth_logon(NETLOGON_LOGON_INFO_CLASS logon_level,
+    PVOID logon_information, PULONG user_flags, PBOOLEAN authoritative,
     PLARGE_INTEGER logoff_time, PLARGE_INTEGER kickoff_time)
 {
-	(void)flags;
-	(void)which_fields;
-	(void)user_all;
-
 	trace_line("entry logon_level", (ULONG)logon_level);
 	trace_line("entry logon_information", (ULONG)(ULONG_PTR)logon_information);
 
@@ -98,4 +84,59 @@ Msv1_0SubAuthenticationRoutine(NETLOGON_LOGON_INFO_CLASS logon_level,
 
 	trace_line("accept", 0);
 	return STATUS_SUCCESS;
+}
+
+BOOL WINAPI
+DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
+{
+	(void)instance;
+	(void)reserved;
+	if (reason == DLL_PROCESS_ATTACH)
+		trace_line("dll process attach", 0);
+	return TRUE;
+}
+
+NTSTATUS NTAPI
+Msv1_0SubAuthenticationRoutine(NETLOGON_LOGON_INFO_CLASS logon_level,
+    PVOID logon_information, ULONG flags, PUSER_ALL_INFORMATION user_all,
+    PULONG which_fields, PULONG user_flags, PBOOLEAN authoritative,
+    PLARGE_INTEGER logoff_time, PLARGE_INTEGER kickoff_time)
+{
+	(void)flags;
+	(void)which_fields;
+	(void)user_all;
+
+	trace_line("routine", 0);
+	return accept_subauth_logon(logon_level, logon_information, user_flags,
+	    authoritative, logoff_time, kickoff_time);
+}
+
+NTSTATUS NTAPI
+Msv1_0SubAuthenticationRoutineEx(NETLOGON_LOGON_INFO_CLASS logon_level,
+    PVOID logon_information, ULONG flags, PUSER_ALL_INFORMATION user_all,
+    SAM_HANDLE user_handle, PMSV1_0_VALIDATION_INFO validation_info,
+    PULONG actions_performed)
+{
+	NTSTATUS status;
+
+	(void)flags;
+	(void)user_all;
+	(void)user_handle;
+
+	trace_line("routine_ex", 0);
+	if (actions_performed != NULL)
+		*actions_performed = 0;
+
+	status = accept_subauth_logon(logon_level, logon_information,
+	    validation_info != NULL ? &validation_info->UserFlags : NULL,
+	    validation_info != NULL ? &validation_info->Authoritative : NULL,
+	    validation_info != NULL ? &validation_info->LogoffTime : NULL,
+	    validation_info != NULL ? &validation_info->KickoffTime : NULL);
+	if (status == STATUS_SUCCESS && validation_info != NULL) {
+		validation_info->WhichFields =
+		    MSV1_0_VALIDATION_LOGOFF_TIME |
+		    MSV1_0_VALIDATION_KICKOFF_TIME |
+		    MSV1_0_VALIDATION_USER_FLAGS;
+	}
+	return status;
 }
