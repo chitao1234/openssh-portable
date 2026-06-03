@@ -38,6 +38,7 @@
 typedef struct _SPAWN_OPTIONS {
 	const char *cmd;
 	const char *cwd;
+	const char *stdio_file;
 	DWORD flags;
 	int use_stdio;
 	int use_environment;
@@ -244,8 +245,11 @@ spawn_as_token(HANDLE token, const SPAWN_OPTIONS *options)
 	STARTUPINFOW si;
 	PROCESS_INFORMATION pi;
 	HANDLE primary = NULL;
+	HANDLE child_stdin = INVALID_HANDLE_VALUE;
+	HANDLE child_stdout = INVALID_HANDLE_VALUE;
 	wchar_t *cmd_w = NULL;
 	wchar_t *cwd_w = NULL;
+	wchar_t *stdio_file_w = NULL;
 	LPVOID environment = NULL;
 	DWORD exit_code = 0;
 	int ret = -1;
@@ -261,11 +265,36 @@ spawn_as_token(HANDLE token, const SPAWN_OPTIONS *options)
 	if (options->cwd != NULL && (cwd_w = utf8_to_utf16(options->cwd)) ==
 	    NULL)
 		goto done;
+	if (options->stdio_file != NULL &&
+	    (stdio_file_w = utf8_to_utf16(options->stdio_file)) == NULL)
+		goto done;
 
 	memset(&si, 0, sizeof(si));
 	memset(&pi, 0, sizeof(pi));
 	si.cb = sizeof(si);
-	if (options->use_stdio) {
+	if (stdio_file_w != NULL) {
+		SECURITY_ATTRIBUTES sa;
+
+		memset(&sa, 0, sizeof(sa));
+		sa.nLength = sizeof(sa);
+		sa.bInheritHandle = TRUE;
+		child_stdin = CreateFileW(L"NUL", GENERIC_READ,
+		    FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_EXISTING,
+		    FILE_ATTRIBUTE_NORMAL, NULL);
+		child_stdout = CreateFileW(stdio_file_w, GENERIC_WRITE,
+		    FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, CREATE_ALWAYS,
+		    FILE_ATTRIBUTE_NORMAL, NULL);
+		if (child_stdin == INVALID_HANDLE_VALUE ||
+		    child_stdout == INVALID_HANDLE_VALUE) {
+			printf("opening child stdio failed: %lu\n",
+			    GetLastError());
+			goto done;
+		}
+		si.dwFlags = STARTF_USESTDHANDLES;
+		si.hStdInput = child_stdin;
+		si.hStdOutput = child_stdout;
+		si.hStdError = child_stdout;
+	} else if (options->use_stdio) {
 		si.dwFlags = STARTF_USESTDHANDLES;
 		si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
 		si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -278,7 +307,8 @@ spawn_as_token(HANDLE token, const SPAWN_OPTIONS *options)
 	}
 
 	if (!CreateProcessAsUserW(primary, NULL, cmd_w, NULL, NULL,
-	    options->use_stdio ? TRUE : FALSE, options->flags |
+	    (options->use_stdio || stdio_file_w != NULL) ? TRUE : FALSE,
+	    options->flags |
 	    (environment != NULL ? CREATE_UNICODE_ENVIRONMENT : 0),
 	    environment, cwd_w, &si, &pi)) {
 		printf("CreateProcessAsUserW failed: %lu\n", GetLastError());
@@ -295,10 +325,15 @@ done:
 		CloseHandle(pi.hThread);
 	if (pi.hProcess != NULL)
 		CloseHandle(pi.hProcess);
+	if (child_stdin != INVALID_HANDLE_VALUE)
+		CloseHandle(child_stdin);
+	if (child_stdout != INVALID_HANDLE_VALUE)
+		CloseHandle(child_stdout);
 	if (environment != NULL)
 		DestroyEnvironmentBlock(environment);
 	if (primary != NULL)
 		CloseHandle(primary);
+	free(stdio_file_w);
 	free(cwd_w);
 	free(cmd_w);
 	return ret;
@@ -311,7 +346,7 @@ usage(const char *prog)
 	    "usage: %s --user USER [--domain DOMAIN] [--package NAME]"
 	    " [--logon-type network|batch|interactive] [--cmd COMMAND]"
 	    " [--cwd DIR] [--create-flags none|no-window|detached]"
-	    " [--no-stdio] [--env]\n", prog);
+	    " [--no-stdio] [--stdio-file FILE] [--env]\n", prog);
 }
 
 static int
@@ -376,6 +411,9 @@ main(int argc, char **argv)
 			spawn_options.cmd = argv[++i];
 		else if (strcmp(argv[i], "--cwd") == 0 && i + 1 < argc)
 			spawn_options.cwd = argv[++i];
+		else if (strcmp(argv[i], "--stdio-file") == 0 &&
+		    i + 1 < argc)
+			spawn_options.stdio_file = argv[++i];
 		else if (strcmp(argv[i], "--logon-type") == 0 && i + 1 < argc) {
 			if (parse_logon_type(argv[++i], &logon_type) != 0) {
 				usage(argv[0]);

@@ -13,6 +13,7 @@
  *   sc start openssh-lsa-probe authpkg-cmd
  *   sc start openssh-lsa-probe authpkg-cmd-batch
  *   sc start openssh-lsa-probe authpkg-cmd-detached
+ *   sc start openssh-lsa-probe authpkg-cmd-stdio-file
  */
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0501
@@ -80,6 +81,11 @@ run_child(const char *mode)
 		    "--domain . --logon-type batch --env --cwd C:\\chi "
 		    "--create-flags no-window --cmd \"cmd /c echo TOKEN_OK && "
 		    "set USERNAME\"";
+	else if (mode != NULL && strcmp(mode, "authpkg-cmd-stdio-file") == 0)
+		cmd = "C:\\chi\\win32-lsa-auth-probe.exe --user xpuser "
+		    "--domain . --cwd C:\\chi --create-flags no-window "
+		    "--stdio-file C:\\chi\\lsa-token-child.out "
+		    "--cmd \"cmd /c echo TOKEN_OK && set USERNAME\"";
 	else if (mode != NULL && strcmp(mode, "authpkg-cmd-interactive") == 0)
 		cmd = "C:\\chi\\win32-lsa-auth-probe.exe --user xpuser "
 		    "--domain . --logon-type interactive --env --cwd C:\\chi "
