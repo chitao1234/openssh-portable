@@ -41,6 +41,7 @@
 #include <sddl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <tlhelp32.h>
 
 #include "utf.h"
 #include "misc_internal.h"
@@ -58,6 +59,51 @@ SERVICE_TABLE_ENTRYW dispatch_table[] =
 };
 static SERVICE_STATUS_HANDLE service_status_handle;
 static SERVICE_STATUS service_status;
+
+static BOOL
+launched_by_service_control_manager(void)
+{
+	PROCESSENTRY32W pe;
+	DWORD pid = GetCurrentProcessId();
+	DWORD parent_pid = 0;
+	HANDLE snapshot;
+	BOOL ret = TRUE;
+
+	snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (snapshot == INVALID_HANDLE_VALUE)
+		return TRUE;
+
+	memset(&pe, 0, sizeof(pe));
+	pe.dwSize = sizeof(pe);
+	if (!Process32FirstW(snapshot, &pe))
+		goto done;
+
+	do {
+		if (pe.th32ProcessID == pid) {
+			parent_pid = pe.th32ParentProcessID;
+			break;
+		}
+	} while (Process32NextW(snapshot, &pe));
+
+	if (parent_pid == 0)
+		goto done;
+
+	memset(&pe, 0, sizeof(pe));
+	pe.dwSize = sizeof(pe);
+	if (!Process32FirstW(snapshot, &pe))
+		goto done;
+
+	do {
+		if (pe.th32ProcessID == parent_pid) {
+			ret = (_wcsicmp(pe.szExeFile, L"services.exe") == 0);
+			goto done;
+		}
+	} while (Process32NextW(snapshot, &pe));
+
+done:
+	CloseHandle(snapshot);
+	return ret;
+}
 
 
 static VOID ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint)
@@ -267,6 +313,9 @@ int wmain(int argc, wchar_t **wargv) {
 		if(path_value)
 			free(path_value);
 	}
+
+	if (!launched_by_service_control_manager())
+		return sshd_main(argc, wargv);
 
 	if (!StartServiceCtrlDispatcherW(dispatch_table)) {
 		if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
