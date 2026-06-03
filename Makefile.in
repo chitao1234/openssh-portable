@@ -84,10 +84,11 @@ UIDSWAP_OBJS=@UIDSWAP_OBJS@
 WMAIN_LDFLAGS=$(LDFLAGS) @WIN32_WMAIN_LDFLAGS@
 SSHAGENT_LDFLAGS=$(LDFLAGS) @WIN32_WMAIN_LDFLAGS@
 WIN32_SPAWN_EXT_OBJ=@WIN32_SPAWN_EXT_OBJ@
+WIN32_LSA_AUTH_TARGET=@WIN32_LSA_AUTH_TARGET@
 
-.SUFFIXES: .lo
+.SUFFIXES: .lo .dll
 
-TARGETS=ssh$(EXEEXT) sshd$(EXEEXT) sshd-session$(EXEEXT) sshd-auth$(EXEEXT) ssh-add$(EXEEXT) ssh-keygen$(EXEEXT) ssh-keyscan${EXEEXT} ssh-keysign${EXEEXT} ssh-pkcs11-helper$(EXEEXT) ssh-agent$(EXEEXT) scp$(EXEEXT) sftp-server$(EXEEXT) sftp$(EXEEXT) ssh-sk-helper$(EXEEXT) $(WIN32_SHELLHOST_TARGET) $(SK_STANDALONE)
+TARGETS=ssh$(EXEEXT) sshd$(EXEEXT) sshd-session$(EXEEXT) sshd-auth$(EXEEXT) ssh-add$(EXEEXT) ssh-keygen$(EXEEXT) ssh-keyscan${EXEEXT} ssh-keysign${EXEEXT} ssh-pkcs11-helper$(EXEEXT) ssh-agent$(EXEEXT) scp$(EXEEXT) sftp-server$(EXEEXT) sftp$(EXEEXT) ssh-sk-helper$(EXEEXT) $(WIN32_SHELLHOST_TARGET) $(WIN32_LSA_AUTH_TARGET) $(SK_STANDALONE)
 
 XMSS_OBJS=\
 	ssh-xmss.o \
@@ -289,6 +290,12 @@ win32-utf8.o: $(srcdir)/contrib/win32/win32compat/win32-utf8.c
 
 shell-host.o: $(srcdir)/contrib/win32/win32compat/shell-host.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+openssh-lsa-auth.dll: $(srcdir)/contrib/win32/win32compat/openssh_lsa_auth_package.c
+	$(CC) -o $@ -shared $(CFLAGS_NOPIE) $(CPPFLAGS) \
+	    $(srcdir)/contrib/win32/win32compat/openssh_lsa_auth_package.c \
+	    $(LDFLAGS_NOPIE) -static-libgcc -Wl,--add-stdcall-alias \
+	    -lnetapi32 -ladvapi32
 
 utf.o: $(srcdir)/contrib/win32/win32compat/utf.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@

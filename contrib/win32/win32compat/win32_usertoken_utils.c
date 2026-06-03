@@ -42,6 +42,7 @@
 #include <shlobj.h>
 #include <lm.h>
 #include <security.h>
+#include <limits.h>
 
 #include "utf.h"
 #include "w32api_proxies.h"
@@ -51,6 +52,7 @@
 #include <ntstatus.h>
 #include "misc_internal.h"
 #include "lsa_missingdefs.h"
+#include "openssh_lsa_auth.h"
 #include "Debug.h"
 #include "pwd.h"
 
@@ -93,6 +95,172 @@ done:
 		CloseHandle(hProcToken);
 
 	return;
+}
+
+static int
+split_local_lsa_user(wchar_t *user_cpn, wchar_t **user, wchar_t **domain)
+{
+	wchar_t computer[MAX_COMPUTERNAME_LENGTH + 1];
+	DWORD computer_len = ARRAYSIZE(computer);
+	wchar_t *separator;
+
+	*user = user_cpn;
+	*domain = L".";
+	if ((separator = wcschr(user_cpn, L'\\')) == NULL)
+		return 0;
+	*separator = L'\0';
+	*domain = user_cpn;
+	*user = separator + 1;
+
+	if ((*user)[0] == L'\0' || (*domain)[0] == L'\0')
+		return -1;
+	if (_wcsicmp(*domain, L".") == 0)
+		return 0;
+	if (GetComputerNameW(computer, &computer_len) == 0)
+		return -1;
+	if (_wcsicmp(*domain, computer) == 0) {
+		*domain = L".";
+		return 0;
+	}
+	return -1;
+}
+
+static OPENSSH_LSA_AUTH_REQUEST *
+build_openssh_lsa_auth_request(ULONG opcode, const wchar_t *user,
+    const wchar_t *domain, const UCHAR *grant, ULONG *request_len)
+{
+	OPENSSH_LSA_AUTH_REQUEST *request;
+	size_t user_bytes, domain_bytes, total, off;
+
+	*request_len = 0;
+	if (user == NULL || domain == NULL)
+		return NULL;
+	user_bytes = (wcslen(user) + 1) * sizeof(wchar_t);
+	domain_bytes = (wcslen(domain) + 1) * sizeof(wchar_t);
+	total = sizeof(*request) + user_bytes + domain_bytes;
+	if (total > ULONG_MAX)
+		return NULL;
+	request = calloc(1, total);
+	if (request == NULL)
+		return NULL;
+	request->magic = OPENSSH_LSA_AUTH_MAGIC;
+	request->version = OPENSSH_LSA_AUTH_VERSION;
+	request->opcode = opcode;
+	request->user_bytes = (ULONG)user_bytes;
+	request->domain_bytes = (ULONG)domain_bytes;
+	if (grant != NULL)
+		memcpy(request->grant, grant, OPENSSH_LSA_AUTH_GRANT_BYTES);
+	off = sizeof(*request);
+	memcpy((PBYTE)request + off, user, user_bytes);
+	off += user_bytes;
+	memcpy((PBYTE)request + off, domain, domain_bytes);
+	*request_len = (ULONG)total;
+	return request;
+}
+
+static HANDLE
+generate_openssh_lsa_user_token(wchar_t *user_cpn)
+{
+	HANDLE lsa_handle = NULL, token = NULL;
+	LSA_OPERATIONAL_MODE mode;
+	ULONG auth_package_id, request_len, reply_len = 0, profile_size;
+	NTSTATUS ret, sub_status;
+	LSA_STRING logon_process_name, auth_package_name, origin_name;
+	TOKEN_SOURCE source_context;
+	PVOID reply = NULL, profile = NULL;
+	LUID logon_id = { 0, 0 };
+	QUOTA_LIMITS quotas;
+	OPENSSH_LSA_AUTH_REQUEST *request = NULL;
+	OPENSSH_LSA_AUTH_GRANT_REPLY *grant_reply;
+	wchar_t *user_copy = NULL, *local_user = NULL, *local_domain = NULL;
+
+	if ((user_copy = _wcsdup(user_cpn)) == NULL)
+		goto done;
+	if (split_local_lsa_user(user_copy, &local_user, &local_domain) != 0) {
+		debug3("%s: %ls is not a local XP LSA auth package account",
+		    __func__, user_cpn);
+		goto done;
+	}
+
+	InitLsaString(&logon_process_name, "sshd");
+	if ((ret = LsaRegisterLogonProcess(&logon_process_name, &lsa_handle,
+	    &mode)) != STATUS_SUCCESS) {
+		debug3("%s: LsaRegisterLogonProcess failed: 0x%08lx",
+		    __func__, (unsigned long)ret);
+		goto done;
+	}
+
+	InitLsaString(&auth_package_name, OPENSSH_LSA_AUTH_PACKAGE);
+	if ((ret = LsaLookupAuthenticationPackage(lsa_handle, &auth_package_name,
+	    &auth_package_id)) != STATUS_SUCCESS) {
+		debug3("%s: LsaLookupAuthenticationPackage(%s) failed: 0x%08lx",
+		    __func__, OPENSSH_LSA_AUTH_PACKAGE, (unsigned long)ret);
+		goto done;
+	}
+
+	request = build_openssh_lsa_auth_request(
+	    OPENSSH_LSA_AUTH_OP_CREATE_GRANT, local_user, local_domain, NULL,
+	    &request_len);
+	if (request == NULL)
+		goto done;
+	ret = LsaCallAuthenticationPackage(lsa_handle, auth_package_id, request,
+	    request_len, &reply, &reply_len, &sub_status);
+	if (ret != STATUS_SUCCESS || sub_status != STATUS_SUCCESS) {
+		debug3("%s: LsaCallAuthenticationPackage failed: "
+		    "status=0x%08lx protocol=0x%08lx", __func__,
+		    (unsigned long)ret, (unsigned long)sub_status);
+		goto done;
+	}
+	if (reply_len != sizeof(*grant_reply) || reply == NULL) {
+		debug3("%s: invalid LSA grant reply length %lu", __func__,
+		    (unsigned long)reply_len);
+		goto done;
+	}
+	grant_reply = (OPENSSH_LSA_AUTH_GRANT_REPLY *)reply;
+	if (grant_reply->magic != OPENSSH_LSA_AUTH_MAGIC ||
+	    grant_reply->version != OPENSSH_LSA_AUTH_VERSION ||
+	    grant_reply->status != STATUS_SUCCESS) {
+		debug3("%s: invalid LSA grant reply", __func__);
+		goto done;
+	}
+
+	free(request);
+	request = build_openssh_lsa_auth_request(
+	    OPENSSH_LSA_AUTH_OP_REDEEM_GRANT, local_user, local_domain,
+	    grant_reply->grant, &request_len);
+	if (request == NULL)
+		goto done;
+
+	memset(&source_context, 0, sizeof(source_context));
+	if (strcpy_s(source_context.SourceName, TOKEN_SOURCE_LENGTH, "sshd") != 0 ||
+	    AllocateLocallyUniqueId(&source_context.SourceIdentifier) != TRUE)
+		goto done;
+
+	InitLsaString(&origin_name, "sshd");
+	ret = LsaLogonUser(lsa_handle, &origin_name, Network, auth_package_id,
+	    request, request_len, NULL, &source_context, &profile,
+	    &profile_size, &logon_id, &token, &quotas, &sub_status);
+	if (ret != STATUS_SUCCESS) {
+		debug3("%s: LsaLogonUser failed for %ls: "
+		    "status=0x%08lx substatus=0x%08lx", __func__,
+		    local_user, (unsigned long)ret, (unsigned long)sub_status);
+		token = NULL;
+		goto done;
+	}
+	debug3("%s: LsaLogonUser succeeded for %ls", __func__, local_user);
+
+done:
+	if (reply)
+		LsaFreeReturnBuffer(reply);
+	if (profile)
+		LsaFreeReturnBuffer(profile);
+	if (lsa_handle)
+		LsaDeregisterLogonProcess(lsa_handle);
+	if (request)
+		free(request);
+	if (user_copy)
+		free(user_copy);
+	return token;
 }
 
 HANDLE
@@ -382,7 +550,10 @@ get_user_token(const char* user, int impersonation) {
 		/* work around for https://github.com/PowerShell/Win32-OpenSSH/issues/727 by doing a fake login */
 		pLogonUserExExW(L"FakeUser", L"FakeDomain", L"FakePasswd",
 			LOGON32_LOGON_NETWORK_CLEARTEXT, LOGON32_PROVIDER_DEFAULT, NULL, &token, NULL, NULL, NULL, NULL);
-		if ((token = generate_s4u_user_token(user_utf16, impersonation)) == 0)
+		if ((token = generate_s4u_user_token(user_utf16, impersonation)) == 0 &&
+		    impersonation && pIsWindowsVistaOrGreater() == FALSE)
+			token = generate_openssh_lsa_user_token(user_utf16);
+		if (token == 0)
 			error("%s - unable to generate token on 2nd attempt for user %ls", __func__, user_utf16);
 		goto done;
 	}
