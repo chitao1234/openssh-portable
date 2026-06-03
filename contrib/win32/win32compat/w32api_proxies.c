@@ -30,6 +30,7 @@
 #include "w32api_proxies.h"
 #include "Debug.h"
 #include "misc_internal.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 #ifndef STATUS_BUFFER_OVERFLOW
@@ -653,8 +654,9 @@ pRegGetValueW(HKEY hkey, LPCWSTR subkey, LPCWSTR value, DWORD flags, LPDWORD typ
 	DWORD reg_type = 0;
 	DWORD query_type = 0;
 	DWORD query_size = 0;
-	wchar_t *tmp = NULL;
+	wchar_t *raw = NULL;
 	DWORD access = KEY_QUERY_VALUE;
+	BOOL expand = FALSE;
 
 	if (flags & RRF_SUBKEY_WOW6464KEY)
 		access |= KEY_WOW64_64KEY;
@@ -679,11 +681,71 @@ pRegGetValueW(HKEY hkey, LPCWSTR subkey, LPCWSTR value, DWORD flags, LPDWORD typ
 		goto done;
 	}
 
-	query_type = reg_type;
+	expand = (flags & RRF_RT_REG_SZ) != 0 &&
+	    reg_type == REG_EXPAND_SZ && (flags & RRF_NOEXPAND) == 0;
+	query_type = expand ? REG_SZ : reg_type;
 	if (type != NULL)
 		*type = query_type;
 
+	if (expand) {
+		DWORD raw_size = query_size;
+		DWORD expanded_chars, expanded_size;
+
+		if (query_size > (DWORD)-1 - sizeof(wchar_t)) {
+			status = ERROR_NOT_ENOUGH_MEMORY;
+			goto done;
+		}
+		raw = calloc(query_size + sizeof(wchar_t), 1);
+		if (raw == NULL) {
+			status = ERROR_NOT_ENOUGH_MEMORY;
+			goto done;
+		}
+		status = RegQueryValueExW(hkey, value, 0, &reg_type,
+		    (LPBYTE)raw, &raw_size);
+		if (status != ERROR_SUCCESS)
+			goto done;
+		expanded_chars = ExpandEnvironmentStringsW(raw, NULL, 0);
+		if (expanded_chars == 0) {
+			status = GetLastError();
+			goto done;
+		}
+		if (expanded_chars > (DWORD)-1 / sizeof(wchar_t)) {
+			status = ERROR_MORE_DATA;
+			goto done;
+		}
+		expanded_size = expanded_chars * sizeof(wchar_t);
+
+		if (data == NULL) {
+			if (size == NULL) {
+				status = ERROR_INVALID_PARAMETER;
+				goto done;
+			}
+			*size = expanded_size;
+			status = ERROR_SUCCESS;
+			goto done;
+		}
+
+		if (size == NULL || *size < expanded_size) {
+			if (size != NULL)
+				*size = expanded_size;
+			status = ERROR_MORE_DATA;
+			goto done;
+		}
+		if (ExpandEnvironmentStringsW(raw, data,
+		    *size / sizeof(wchar_t)) == 0) {
+			status = GetLastError();
+			goto done;
+		}
+		*size = expanded_size;
+		status = ERROR_SUCCESS;
+		goto done;
+	}
+
 	if (data == NULL) {
+		if (size == NULL) {
+			status = ERROR_INVALID_PARAMETER;
+			goto done;
+		}
 		*size = query_size;
 		status = ERROR_SUCCESS;
 		goto done;
@@ -700,37 +762,12 @@ pRegGetValueW(HKEY hkey, LPCWSTR subkey, LPCWSTR value, DWORD flags, LPDWORD typ
 	if (status != ERROR_SUCCESS)
 		goto done;
 
-	if ((flags & RRF_RT_REG_SZ) != 0 && query_type == REG_EXPAND_SZ && (flags & RRF_NOEXPAND) == 0) {
-		DWORD expanded_chars = ExpandEnvironmentStringsW((LPCWSTR)data, NULL, 0);
-		if (expanded_chars == 0) {
-			status = GetLastError();
-			goto done;
-		}
-		if (*size < expanded_chars * sizeof(wchar_t)) {
-			*size = expanded_chars * sizeof(wchar_t);
-			status = ERROR_MORE_DATA;
-			goto done;
-		}
-		tmp = calloc(expanded_chars, sizeof(wchar_t));
-		if (tmp == NULL) {
-			status = ERROR_NOT_ENOUGH_MEMORY;
-			goto done;
-		}
-		if (ExpandEnvironmentStringsW((LPCWSTR)data, tmp, expanded_chars) == 0) {
-			status = GetLastError();
-			goto done;
-		}
-		memcpy(data, tmp, expanded_chars * sizeof(wchar_t));
-		*size = expanded_chars * sizeof(wchar_t);
-		query_type = REG_SZ;
-	}
-
 	if (type != NULL)
 		*type = query_type;
 
 done:
-	if (tmp != NULL)
-		free(tmp);
+	if (raw != NULL)
+		free(raw);
 	if (opened_key != NULL)
 		RegCloseKey(opened_key);
 	return status;

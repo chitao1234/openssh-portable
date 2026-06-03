@@ -18,16 +18,7 @@ top_srcdir=@top_srcdir@
 abs_top_srcdir=@abs_top_srcdir@
 abs_top_builddir=@abs_top_builddir@
 
-vpath %.c @srcdir@
-vpath %.h @srcdir@
-vpath %.in @srcdir@
-vpath %.0 @srcdir@
-vpath %.1 @srcdir@
-vpath %.5 @srcdir@
-vpath %.8 @srcdir@
-vpath moduli @srcdir@
-vpath ssh_config @srcdir@
-vpath sshd_config @srcdir@
+VPATH=@srcdir@
 SSH_PROGRAM=@bindir@/ssh
 ASKPASS_PROGRAM=$(libexecdir)/ssh-askpass
 SFTP_SERVER=$(libexecdir)/sftp-server
@@ -43,27 +34,7 @@ TEST_SHELL=@TEST_SHELL@
 BUILDDIR=@abs_top_builddir@
 SK_STANDALONE=@SK_STANDALONE@
 
-PATHS= -DSSHDIR=\"$(sysconfdir)\" \
-	-D_PATH_SSH_PROGRAM=\"$(SSH_PROGRAM)\" \
-	-D_PATH_SSH_ASKPASS_DEFAULT=\"$(ASKPASS_PROGRAM)\" \
-	-D_PATH_SFTP_SERVER=\"$(SFTP_SERVER)\" \
-	-D_PATH_SSH_KEY_SIGN=\"$(SSH_KEYSIGN)\" \
-	-D_PATH_SSHD_SESSION=\"$(SSHD_SESSION)\" \
-	-D_PATH_SSHD_AUTH=\"$(SSHD_AUTH)\" \
-	-D_PATH_SSH_PKCS11_HELPER=\"$(SSH_PKCS11_HELPER)\" \
-	-D_PATH_SSH_SK_HELPER=\"$(SSH_SK_HELPER)\" \
-	-D_PATH_SSH_PIDDIR=\"$(piddir)\" \
-	-D_PATH_PRIVSEP_CHROOT_DIR=\"$(PRIVSEP_PATH)\"
-ifneq (@WIN32COMPAT_LIB@,)
-PATHS= -DSSHDIR=\"__PROGRAMDATA__\\\\ssh\" \
-	-D_PATH_SSH_PROGRAM=\"ssh.exe\" \
-	-D_PATH_SFTP_SERVER=\"sftp-server.exe\" \
-	-D_PATH_SSH_PIDDIR=\"__PROGRAMDATA__\\\\ssh\" \
-	-D_PATH_PRIVSEP_CHROOT_DIR=\".\" \
-	-D_PATH_LS=\"dir\" \
-	-D_PATH_DEVNULL=\"NUL\" \
-	-D_PATH_TTY=\"conin$$\"
-endif
+PATHS=@OPENSSH_PATHS@
 
 CC=@CC@
 LD=@LD@
@@ -93,54 +64,26 @@ MKDIR_P=@MKDIR_P@
 WIN32COMPATLIB=@WIN32COMPAT_LIB@
 GROUPACCESS_O=@GROUPACCESS_O@
 
-WIN32_SESSION_OBJS=
-ifneq ($(WIN32COMPATLIB),)
-WIN32_SESSION_OBJS=w32-doexec.o
-endif
+WIN32_SESSION_OBJS=@WIN32_SESSION_OBJS@
 
-WIN32_AGENT_OBJS=
-ifneq ($(WIN32COMPATLIB),)
-WIN32_AGENT_OBJS=win32_ssh_agent_main.o win32_ssh_agent.o \
-	win32_ssh_agent_connection.o win32_ssh_agent_keyagent_request.o
-endif
+WIN32_AGENT_OBJS=@WIN32_AGENT_OBJS@
 
-WIN32_SHELLHOST_TARGET=
-ifneq ($(WIN32COMPATLIB),)
-WIN32_SHELLHOST_TARGET=ssh-shellhost$(EXEEXT)
-endif
+WIN32_SHELLHOST_TARGET=@WIN32_SHELLHOST_TARGET@
 
-WIN32_TTY_OBJS=
-ifneq ($(WIN32COMPATLIB),)
-WIN32_TTY_OBJS=win32_sshtty.o win32_sshpty.o ttymodes_windows.o
-endif
+WIN32_TTY_OBJS=@WIN32_TTY_OBJS@
 
-LIBSSH_UTF8_OBJ=utf8.o
-ifneq ($(WIN32COMPATLIB),)
-LIBSSH_UTF8_OBJ=win32-utf8.o
-endif
+LIBSSH_UTF8_OBJ=@LIBSSH_UTF8_OBJ@
 
-WIN32_WMAIN_COMMON_OBJ=
-WIN32_WMAIN_SSHD_OBJ=
-WIN32_WMAIN_SSHD_SESSION_OBJ=
-WIN32_WMAIN_SSHD_AUTH_OBJ=
-ifneq ($(WIN32COMPATLIB),)
-WIN32_WMAIN_COMMON_OBJ=wmain_common.o
-WIN32_WMAIN_SSHD_OBJ=wmain_sshd.o
-WIN32_WMAIN_SSHD_SESSION_OBJ=wmain_sshd-session.o
-WIN32_WMAIN_SSHD_AUTH_OBJ=wmain_sshd-auth.o
-endif
+WIN32_WMAIN_COMMON_OBJ=@WIN32_WMAIN_COMMON_OBJ@
+WIN32_WMAIN_SSHD_OBJ=@WIN32_WMAIN_SSHD_OBJ@
+WIN32_WMAIN_SSHD_SESSION_OBJ=@WIN32_WMAIN_SSHD_SESSION_OBJ@
+WIN32_WMAIN_SSHD_AUTH_OBJ=@WIN32_WMAIN_SSHD_AUTH_OBJ@
 
-UIDSWAP_OBJS=uidswap.o
-ifneq ($(WIN32COMPATLIB),)
-UIDSWAP_OBJS=
-endif
+UIDSWAP_OBJS=@UIDSWAP_OBJS@
 
-WMAIN_LDFLAGS=$(LDFLAGS)
-SSHAGENT_LDFLAGS=$(LDFLAGS)
-ifneq ($(WIN32COMPATLIB),)
-WMAIN_LDFLAGS+=-municode
-SSHAGENT_LDFLAGS+=-municode
-endif
+WMAIN_LDFLAGS=$(LDFLAGS) @WIN32_WMAIN_LDFLAGS@
+SSHAGENT_LDFLAGS=$(LDFLAGS) @WIN32_WMAIN_LDFLAGS@
+WIN32_SPAWN_EXT_OBJ=@WIN32_SPAWN_EXT_OBJ@
 
 .SUFFIXES: .lo
 
@@ -187,10 +130,7 @@ LIBSSH_OBJS=${LIBOPENSSH_OBJS} \
 	kexsntrup761x25519.o kexmlkem768x25519.o sntrup761.o kexgen.o \
 	sftp-realpath.o platform-pledge.o platform-tracing.o platform-misc.o \
 	sshbuf-io.o \
-	$(WIN32_TTY_OBJS)
-ifneq ($(WIN32COMPATLIB),)
-LIBSSH_OBJS += spawn-ext.o
-endif
+	$(WIN32_TTY_OBJS) $(WIN32_SPAWN_EXT_OBJ)
 
 SKOBJS=	ssh-sk-client.o
 
@@ -242,10 +182,7 @@ SCP_OBJS=	scp.o progressmeter.o $(SFTP_CLIENT_OBJS) \
 SSHADD_OBJS=	ssh-add.o $(SKOBJS) \
 	$(WIN32_WMAIN_COMMON_OBJ)
 
-SSHAGENT_OBJS=	ssh-agent.o ssh-pkcs11-client.o $(SKOBJS)
-ifneq ($(WIN32COMPATLIB),)
-SSHAGENT_OBJS=	$(WIN32_AGENT_OBJS) ssh-pkcs11-client.o $(SKOBJS)
-endif
+SSHAGENT_OBJS=@SSHAGENT_OBJS@
 
 SSHKEYGEN_OBJS=	ssh-keygen.o sshsig.o $(SKOBJS) \
 	$(WIN32_WMAIN_COMMON_OBJ)
@@ -727,10 +664,7 @@ regress-prep:
 	    ln -s `cd $(srcdir) && pwd`/regress/Makefile `pwd`/regress/Makefile
 
 REGRESSLIBS=libssh.a $(LIBCOMPAT)
-TESTLIBS=$(LIBS) $(CHANNELLIBS)
-ifneq ($(WIN32COMPATLIB),)
-TESTLIBS=$(WIN32COMPATLIB) $(LIBS) $(CHANNELLIBS)
-endif
+TESTLIBS=@TESTLIBS@
 
 regress/modpipe$(EXEEXT): $(srcdir)/regress/modpipe.c $(REGRESSLIBS)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $(srcdir)/regress/modpipe.c \
