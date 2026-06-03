@@ -78,6 +78,7 @@ COMPAT= bsd-asprintf.o \
 	bsd-malloc.o \
 	bsd-misc.o \
 	bsd-nextstep.o \
+	@OPENBSD_COMPAT_EXTRA_OBJS@ \
 	bsd-poll.o \
 	bsd-pselect.o \
 	bsd-setres_id.o \

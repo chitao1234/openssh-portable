@@ -5,7 +5,11 @@
 */
 #pragma once
 #include <stddef.h>
-#include_next <process.h>
+#if defined(__GNUC__)
+# include_next <process.h>
+#else
+# include <process.h>
+#endif
 #include "sys/time.h"
 #include "sys/types.h"
 #include "sys/uio.h"
