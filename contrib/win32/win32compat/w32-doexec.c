@@ -81,6 +81,26 @@ do_setup_env_proxy(struct ssh *, Session *, const char *);
 		goto cleanup;					\
 } while(0)
 
+static int
+is_module_helper_command(const char *command)
+{
+	static const char *helpers[] = {
+		"scp.exe",
+		"sftp-server.exe",
+	};
+	size_t i, len;
+
+	if (command == NULL)
+		return 0;
+	for (i = 0; i < _countof(helpers); i++) {
+		len = strlen(helpers[i]);
+		if (_memicmp(command, helpers[i], len) == 0 &&
+		    (command[len] == '\0' ||
+		    isspace((unsigned char)command[len])))
+			return 1;
+	}
+	return 0;
+}
 
 static char*
 get_registry_operation_error_message(const LONG error_code) 
@@ -370,7 +390,10 @@ int do_exec_windows(struct ssh *ssh, Session *s, const char *command, int pty) {
 		exec_command = build_exec_command(command);
 		debug3("exec_command: %s", exec_command);
 
-		if (shell_type == SH_PS || shell_type == SH_BASH ||
+		if (is_module_helper_command(exec_command)) {
+			spawn_argv[0] = exec_command;
+		}
+		else if (shell_type == SH_PS || shell_type == SH_BASH ||
 			shell_type == SH_CYGWIN || (shell_type == SH_OTHER) && arg_escape) {
 			spawn_argv[0] = shell;
 
