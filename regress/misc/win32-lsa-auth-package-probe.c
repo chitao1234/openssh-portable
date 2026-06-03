@@ -143,9 +143,9 @@ LsaApLogonUser(PLSA_CLIENT_REQUEST client_request,
     PLSA_UNICODE_STRING *authenticating_authority)
 {
 	OPENSSH_LSA_AUTH_PROBE_REQUEST *request = NULL;
-	NTSTATUS copy_status = STATUS_NOT_IMPLEMENTED;
 	ULONG request_len = authentication_information_length;
 
+	(void)client_request;
 	(void)client_authentication_base;
 
 	tracef("LogonUser package_id=%lu type=%lu auth=%p len=%lu",
@@ -172,27 +172,13 @@ LsaApLogonUser(PLSA_CLIENT_REQUEST client_request,
 	if (sub_status != NULL)
 		*sub_status = STATUS_LOGON_FAILURE;
 
-	if (lsa_dispatch != NULL && lsa_dispatch->AllocateLsaHeap != NULL &&
-	    lsa_dispatch->FreeLsaHeap != NULL &&
-	    lsa_dispatch->CopyFromClientBuffer != NULL &&
-	    authentication_information != NULL &&
+	if (authentication_information != NULL &&
 	    request_len >= sizeof(*request) && request_len <= 4096) {
-		request = lsa_dispatch->AllocateLsaHeap(request_len);
-		if (request != NULL) {
-			copy_status = lsa_dispatch->CopyFromClientBuffer(
-			    client_request, request_len, request,
-			    authentication_information);
-			tracef("CopyFromClientBuffer status=0x%08lx",
-			    (unsigned long)copy_status);
-			if (copy_status == STATUS_SUCCESS) {
-				tracef("request magic=0x%08lx version=%lu "
-				    "user_bytes=%lu domain_bytes=%lu",
-				    (unsigned long)request->magic,
-				    request->version, request->user_bytes,
-				    request->domain_bytes);
-			}
-			lsa_dispatch->FreeLsaHeap(request);
-		}
+		request = authentication_information;
+		tracef("request magic=0x%08lx version=%lu "
+		    "user_bytes=%lu domain_bytes=%lu",
+		    (unsigned long)request->magic, request->version,
+		    request->user_bytes, request->domain_bytes);
 	}
 
 	tracef("LogonUser returning STATUS_LOGON_FAILURE");
