@@ -20,6 +20,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <ntsecapi.h>
+#include <sddl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -128,6 +129,92 @@ print_token_user(HANDLE token)
 done:
 	free(tu);
 	return ret;
+}
+
+static void
+print_sid_details(const char *prefix, PSID sid, DWORD attrs)
+{
+	LPWSTR sid_string = NULL;
+	WCHAR name[256], domain[256];
+	DWORD name_len, domain_len;
+	SID_NAME_USE use;
+
+	name_len = sizeof(name) / sizeof(name[0]);
+	domain_len = sizeof(domain) / sizeof(domain[0]);
+	printf("%s", prefix);
+	if (ConvertSidToStringSidW(sid, &sid_string)) {
+		wprintf(L"%ls", sid_string);
+		LocalFree(sid_string);
+	}
+	if (LookupAccountSidW(NULL, sid, name, &name_len, domain,
+	    &domain_len, &use))
+		wprintf(L" %ls\\%ls", domain, name);
+	if (attrs != 0)
+		printf(" attrs=0x%08lx", (unsigned long)attrs);
+	printf("\n");
+}
+
+static void
+print_token_details(HANDLE token)
+{
+	TOKEN_TYPE token_type;
+	TOKEN_STATISTICS stats;
+	TOKEN_GROUPS *groups = NULL;
+	TOKEN_PRIVILEGES *privs = NULL;
+	TOKEN_DEFAULT_DACL *dacl = NULL;
+	DWORD needed = 0, i;
+
+	if (GetTokenInformation(token, TokenType, &token_type,
+	    sizeof(token_type), &needed))
+		printf("token type: %s\n",
+		    token_type == TokenPrimary ? "primary" : "impersonation");
+	if (GetTokenInformation(token, TokenStatistics, &stats, sizeof(stats),
+	    &needed)) {
+		printf("token auth id: %lu:%ld token id: %lu:%ld "
+		    "modified id: %lu:%ld\n",
+		    stats.AuthenticationId.LowPart,
+		    stats.AuthenticationId.HighPart, stats.TokenId.LowPart,
+		    stats.TokenId.HighPart, stats.ModifiedId.LowPart,
+		    stats.ModifiedId.HighPart);
+	}
+
+	GetTokenInformation(token, TokenDefaultDacl, NULL, 0, &needed);
+	if (needed != 0 && (dacl = (TOKEN_DEFAULT_DACL *)calloc(1, needed)) !=
+	    NULL && GetTokenInformation(token, TokenDefaultDacl, dacl, needed,
+	    &needed))
+		printf("token default dacl: %s\n",
+		    dacl->DefaultDacl == NULL ? "NULL" : "present");
+	free(dacl);
+
+	GetTokenInformation(token, TokenGroups, NULL, 0, &needed);
+	if (needed != 0 &&
+	    (groups = (TOKEN_GROUPS *)calloc(1, needed)) != NULL &&
+	    GetTokenInformation(token, TokenGroups, groups, needed, &needed)) {
+		printf("token groups: %lu\n", (unsigned long)groups->GroupCount);
+		for (i = 0; i < groups->GroupCount; i++)
+			print_sid_details("  group: ", groups->Groups[i].Sid,
+			    groups->Groups[i].Attributes);
+	}
+	free(groups);
+
+	GetTokenInformation(token, TokenPrivileges, NULL, 0, &needed);
+	if (needed != 0 &&
+	    (privs = (TOKEN_PRIVILEGES *)calloc(1, needed)) != NULL &&
+	    GetTokenInformation(token, TokenPrivileges, privs, needed,
+	    &needed)) {
+		printf("token privileges: %lu\n",
+		    (unsigned long)privs->PrivilegeCount);
+		for (i = 0; i < privs->PrivilegeCount; i++) {
+			WCHAR name[128];
+			DWORD len = sizeof(name) / sizeof(name[0]);
+
+			if (LookupPrivilegeNameW(NULL, &privs->Privileges[i].Luid,
+			    name, &len))
+				wprintf(L"  privilege: %ls attrs=0x%08lx\n",
+				    name, privs->Privileges[i].Attributes);
+		}
+	}
+	free(privs);
 }
 
 static int
@@ -280,6 +367,7 @@ main(int argc, char **argv)
 		goto done;
 
 	print_token_user(token);
+	print_token_details(token);
 	if (cmd != NULL && spawn_as_token(token, cmd) != 0)
 		goto done;
 	ret = 0;
