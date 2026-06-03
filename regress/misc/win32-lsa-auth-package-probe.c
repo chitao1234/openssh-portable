@@ -42,6 +42,9 @@
 #ifndef STATUS_LOGON_FAILURE
 #define STATUS_LOGON_FAILURE ((NTSTATUS)0xC000006DL)
 #endif
+#ifndef STATUS_ACCESS_DENIED
+#define STATUS_ACCESS_DENIED ((NTSTATUS)0xC0000022L)
+#endif
 #ifndef STATUS_ACCOUNT_DISABLED
 #define STATUS_ACCOUNT_DISABLED ((NTSTATUS)0xC0000072L)
 #endif
@@ -128,6 +131,42 @@ lsa_free(PVOID ptr)
 	if (ptr != NULL && lsa_dispatch != NULL &&
 	    lsa_dispatch->FreeLsaHeap != NULL)
 		lsa_dispatch->FreeLsaHeap(ptr);
+}
+
+static NTSTATUS
+return_call_package_buffer(PLSA_CLIENT_REQUEST client_request, const char *s,
+    PVOID *protocol_return_buffer, PULONG return_buffer_length)
+{
+	NTSTATUS status;
+	ULONG len;
+	PVOID client_buffer = NULL;
+
+	if (protocol_return_buffer != NULL)
+		*protocol_return_buffer = NULL;
+	if (return_buffer_length != NULL)
+		*return_buffer_length = 0;
+	if (client_request == NULL || s == NULL || protocol_return_buffer == NULL ||
+	    return_buffer_length == NULL || lsa_dispatch == NULL ||
+	    lsa_dispatch->AllocateClientBuffer == NULL ||
+	    lsa_dispatch->CopyToClientBuffer == NULL)
+		return STATUS_INVALID_PARAMETER;
+
+	len = (ULONG)strlen(s) + 1;
+	status = lsa_dispatch->AllocateClientBuffer(client_request, len,
+	    &client_buffer);
+	if (status != STATUS_SUCCESS)
+		return status;
+	status = lsa_dispatch->CopyToClientBuffer(client_request, len,
+	    client_buffer, (PVOID)s);
+	if (status != STATUS_SUCCESS) {
+		if (lsa_dispatch->FreeClientBuffer != NULL)
+			lsa_dispatch->FreeClientBuffer(client_request,
+			    client_buffer);
+		return status;
+	}
+	*protocol_return_buffer = client_buffer;
+	*return_buffer_length = len;
+	return STATUS_SUCCESS;
 }
 
 static void *
@@ -841,18 +880,14 @@ LsaApCallPackage(PLSA_CLIENT_REQUEST client_request,
     ULONG submit_buffer_length, PVOID *protocol_return_buffer,
     PULONG return_buffer_length, PNTSTATUS protocol_status)
 {
-	(void)client_request;
 	(void)protocol_submit_buffer;
 	(void)client_buffer_base;
-	(void)submit_buffer_length;
-	if (protocol_return_buffer != NULL)
-		*protocol_return_buffer = NULL;
-	if (return_buffer_length != NULL)
-		*return_buffer_length = 0;
+	tracef("CallPackage trusted submit=%p len=%lu", protocol_submit_buffer,
+	    submit_buffer_length);
 	if (protocol_status != NULL)
-		*protocol_status = STATUS_NOT_IMPLEMENTED;
-	tracef("CallPackage returning STATUS_NOT_IMPLEMENTED");
-	return STATUS_NOT_IMPLEMENTED;
+		*protocol_status = STATUS_SUCCESS;
+	return return_call_package_buffer(client_request, "trusted",
+	    protocol_return_buffer, return_buffer_length);
 }
 
 NTSTATUS NTAPI
@@ -861,9 +896,14 @@ LsaApCallPackageUntrusted(PLSA_CLIENT_REQUEST client_request,
     ULONG submit_buffer_length, PVOID *protocol_return_buffer,
     PULONG return_buffer_length, PNTSTATUS protocol_status)
 {
-	return LsaApCallPackage(client_request, protocol_submit_buffer,
-	    client_buffer_base, submit_buffer_length, protocol_return_buffer,
-	    return_buffer_length, protocol_status);
+	(void)protocol_submit_buffer;
+	(void)client_buffer_base;
+	tracef("CallPackageUntrusted submit=%p len=%lu", protocol_submit_buffer,
+	    submit_buffer_length);
+	if (protocol_status != NULL)
+		*protocol_status = STATUS_ACCESS_DENIED;
+	return return_call_package_buffer(client_request, "untrusted",
+	    protocol_return_buffer, return_buffer_length);
 }
 
 NTSTATUS NTAPI

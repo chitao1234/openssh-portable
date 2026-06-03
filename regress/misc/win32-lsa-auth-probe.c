@@ -346,7 +346,8 @@ usage(const char *prog)
 	    "usage: %s --user USER [--domain DOMAIN] [--package NAME]"
 	    " [--logon-type network|batch|interactive] [--cmd COMMAND]"
 	    " [--cwd DIR] [--create-flags none|no-window|detached]"
-	    " [--no-stdio] [--stdio-file FILE] [--env] [--untrusted]\n",
+	    " [--no-stdio] [--stdio-file FILE] [--env] [--untrusted]"
+	    " [--call-package]\n",
 	    prog);
 }
 
@@ -391,14 +392,14 @@ main(int argc, char **argv)
 	LSA_STRING process_name, package_name, origin_name;
 	LSA_HANDLE lsa = NULL;
 	LSA_OPERATIONAL_MODE mode;
-	ULONG auth_package = 0, profile_len = 0;
+	ULONG auth_package = 0, profile_len = 0, call_return_len = 0;
 	TOKEN_SOURCE source;
-	PVOID profile = NULL;
+	PVOID profile = NULL, call_return = NULL;
 	HANDLE token = NULL;
 	LUID logon_id;
 	QUOTA_LIMITS quotas;
 	NTSTATUS status, substatus = 0;
-	int i, ret = 1;
+	int call_package = 0, i, ret = 1;
 
 	memset(&spawn_options, 0, sizeof(spawn_options));
 	spawn_options.use_stdio = 1;
@@ -434,6 +435,8 @@ main(int argc, char **argv)
 			spawn_options.use_environment = 1;
 		else if (strcmp(argv[i], "--untrusted") == 0)
 			trusted = 0;
+		else if (strcmp(argv[i], "--call-package") == 0)
+			call_package = 1;
 		else {
 			usage(argv[0]);
 			return 2;
@@ -492,6 +495,23 @@ main(int argc, char **argv)
 		    "0x%08lx win32=%lu\n", package, (unsigned long)status,
 		    LsaNtStatusToWinError(status));
 		goto done;
+		}
+
+	if (call_package) {
+		status = LsaCallAuthenticationPackage(lsa, auth_package, request,
+		    (ULONG)request_len, &call_return, &call_return_len,
+		    &substatus);
+		printf("LsaCallAuthenticationPackage package=%s status=0x%08lx "
+		    "protocol=0x%08lx win32=%lu return_len=%lu\n", package,
+		    (unsigned long)status, (unsigned long)substatus,
+		    LsaNtStatusToWinError(status),
+		    (unsigned long)call_return_len);
+		if (call_return != NULL && call_return_len > 0)
+			printf("call-package reply: %.*s\n",
+			    (int)call_return_len, (char *)call_return);
+		ret = status == STATUS_SUCCESS && substatus == STATUS_SUCCESS ?
+		    0 : 1;
+		goto done;
 	}
 
 	memset(&source, 0, sizeof(source));
@@ -522,6 +542,8 @@ done:
 		CloseHandle(token);
 	if (profile != NULL)
 		LsaFreeReturnBuffer(profile);
+	if (call_return != NULL)
+		LsaFreeReturnBuffer(call_return);
 	if (lsa != NULL)
 		LsaDeregisterLogonProcess(lsa);
 	free(request);
