@@ -346,7 +346,8 @@ usage(const char *prog)
 	    "usage: %s --user USER [--domain DOMAIN] [--package NAME]"
 	    " [--logon-type network|batch|interactive] [--cmd COMMAND]"
 	    " [--cwd DIR] [--create-flags none|no-window|detached]"
-	    " [--no-stdio] [--stdio-file FILE] [--env]\n", prog);
+	    " [--no-stdio] [--stdio-file FILE] [--env] [--untrusted]\n",
+	    prog);
 }
 
 static int
@@ -383,6 +384,7 @@ main(int argc, char **argv)
 	const char *user = NULL, *domain = ".", *package = NULL;
 	SECURITY_LOGON_TYPE logon_type = Network;
 	SPAWN_OPTIONS spawn_options;
+	int trusted = 1;
 	wchar_t *user_w = NULL, *domain_w = NULL;
 	OPENSSH_LSA_AUTH_PROBE_REQUEST *request = NULL;
 	size_t request_len, off, user_bytes, domain_bytes;
@@ -430,6 +432,8 @@ main(int argc, char **argv)
 			spawn_options.use_stdio = 0;
 		else if (strcmp(argv[i], "--env") == 0)
 			spawn_options.use_environment = 1;
+		else if (strcmp(argv[i], "--untrusted") == 0)
+			trusted = 0;
 		else {
 			usage(argv[0]);
 			return 2;
@@ -462,12 +466,23 @@ main(int argc, char **argv)
 	memcpy((PBYTE)request + off, domain_w, domain_bytes);
 
 	enable_privilege("SeTcbPrivilege");
-	init_lsa_string(&process_name, "openssh-lsa-auth-probe");
-	status = LsaRegisterLogonProcess(&process_name, &lsa, &mode);
-	if (status != STATUS_SUCCESS) {
-		printf("LsaRegisterLogonProcess failed: 0x%08lx win32=%lu\n",
-		    (unsigned long)status, LsaNtStatusToWinError(status));
-		goto done;
+	if (trusted) {
+		init_lsa_string(&process_name, "openssh-lsa-auth-probe");
+		status = LsaRegisterLogonProcess(&process_name, &lsa, &mode);
+		if (status != STATUS_SUCCESS) {
+			printf("LsaRegisterLogonProcess failed: 0x%08lx "
+			    "win32=%lu\n", (unsigned long)status,
+			    LsaNtStatusToWinError(status));
+			goto done;
+		}
+	} else {
+		status = LsaConnectUntrusted(&lsa);
+		if (status != STATUS_SUCCESS) {
+			printf("LsaConnectUntrusted failed: 0x%08lx "
+			    "win32=%lu\n", (unsigned long)status,
+			    LsaNtStatusToWinError(status));
+			goto done;
+		}
 	}
 	init_lsa_string(&package_name, package);
 	status = LsaLookupAuthenticationPackage(lsa, &package_name,
