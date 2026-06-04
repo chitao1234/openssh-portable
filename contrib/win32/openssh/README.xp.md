@@ -1,124 +1,98 @@
-# Windows XP Porting Milestone
+# Windows XP Port Status
 
-This repository is the Microsoft Win32 port of portable OpenSSH. The first
-milestone for Windows XP support is not "full feature parity"; it is to remove
-the most obvious build-time and runtime assumptions that require Windows Vista
-or newer, so the Win32 compatibility layer can be brought up on XP and tested.
+This branch is an XP bring-up of Microsoft's Win32 OpenSSH port. The current
+working target is 32-bit MinGW on Windows XP; it is not a production-ready XP
+release and does not imply feature parity with Windows 7+.
 
-## What this milestone changes
+The sibling `../openssh-5.9p1-win32` tree remains useful as historical Win32
+reference material, but it is not treated as authoritative code for this port.
 
-- Lowers the Win32 target floor in Visual Studio project definitions to
-  `_WIN32_WINNT=0x0501` through a central `$(OpenSSHWinNt)` property.
-- Keeps non-Win32 project targets at the existing `0x0601` floor.
-- Replaces direct calls to several Vista+ APIs in the Win32 compatibility layer
-  with late-bound proxy functions and XP-safe fallbacks where practical.
-- Makes ConPTY detection avoid newer loader flags so XP simply falls back to the
-  legacy `ssh-shellhost.exe` PTY path.
+## Current Build Shape
 
-## APIs that now have XP-oriented handling
+- The active XP path is the MinGW/autotools build. It builds the Win32
+  compatibility layer and the server-side Windows helpers instead of using a
+  separate POSIX-only path.
+- The current XP-tested build is OpenSSL-less and does not require `bcrypt` or
+  `libcrypto` at runtime. This reduces the available algorithm surface; XP
+  validation has focused on Ed25519 host/user keys and the algorithms offered
+  by that build.
+- The Visual Studio projects are still useful for comparing intended Windows
+  wiring, but the XP work is currently validated through the 32-bit MinGW path.
+- ConPTY is not available on XP. Interactive sessions use the legacy
+  `ssh-shellhost.exe` PTY path.
+- Several Vista+ APIs are late-bound through
+  `contrib/win32/win32compat/w32api_proxies.*` so XP can use fallbacks or clean
+  unsupported results instead of failing at load time.
 
-The current tree used these APIs directly:
+## XP Runtime Validation
 
-- `GetTickCount64`
-- `CancelIoEx`
-- `CancelSynchronousIo`
-- `GetFinalPathNameByHandleW`
-- `RegGetValueW`
-- `IsWindows8OrGreater` via `VersionHelpers.h`
-- `LoadLibraryExW(..., LOAD_LIBRARY_SEARCH_SYSTEM32)` in the ConPTY probe
+The following paths have been tested on Windows XP with the 32-bit MinGW build:
 
-The XP milestone routes them through `contrib/win32/win32compat/w32api_proxies.*`
-so the process can:
+- `ssh.exe` client connections from XP to a Linux host.
+- `sshd.exe` as a Windows service on a non-privileged test port.
+- Password authentication for local XP users.
+- Public-key authentication for local XP users through the XP LSA package path.
+- Non-PTY remote command execution.
+- Interactive legacy PTY sessions through `ssh-shellhost.exe`.
+- `sftp-server.exe` as the configured server subsystem.
+- Default `scp` mode, which uses SFTP.
+- Legacy `scp -O` mode.
 
-- late-bind the real API when present on newer systems
-- fall back to older APIs where possible
-- return a clean "unsupported" result instead of hard-failing at load time
+For SFTP paths, use the Windows absolute form `/C:/path/...`. A plain
+`C:/path/...` is parsed as a relative SFTP path by this port.
 
-## Known remaining blockers
+## ACL And Strict Permission Status
 
-This milestone does not mean OpenSSH is ready for Windows XP yet. The biggest
-remaining blockers are deeper than a few Win32 wrappers:
+The Windows port has two different ACL layers, and the distinction matters:
+runtime `StrictModes` checks for user authentication files, and install/repair
+ACL policy for server configuration and application files.
 
-1. Toolchain floor
+- `StrictModes yes` rejects an insecure user's `authorized_keys` at runtime.
+  On XP, adding writable `Everyone` access to
+  `C:\Documents and Settings\<user>\.ssh\authorized_keys` caused public-key
+  authentication to fail with `Permission denied (publickey)`.
+- Host private keys are repaired by service startup code. On XP, adding writable
+  `Everyone` access to `ssh_host_ed25519_key` was removed on the next service
+  start, restoring the private key to Administrators/System-only access.
+- `sshd_config` permissions are installation/repair policy, not a runtime gate.
+  The Windows repair function is `Repair-SshdConfigPermission`; current runtime
+  tests show `sshd` does not reject a writable custom `-f` config file.
+- Application binaries, including `sftp-server.exe`, are also installation
+  ACL policy. `Repair-ApplicationFilePermission` allows normal users
+  read/execute access and removes write access, but current runtime tests show
+  subsystem launch does not reject a writable `sftp-server.exe`.
 
-The checked-in Windows build currently assumes modern Visual Studio 2022,
-`v143`, recent Windows SDKs, and `/Qspectre`-compatible CRTs. Those are not an
-XP-targeting toolchain. You will likely need a separate legacy build path for
-the `Win32` platform, potentially using an older MSVC or MinGW-based workflow.
+For production-style XP packaging, the installer or setup tool must apply the
+server config, host key, application binary, and user key ACL policies. Runtime
+checks alone do not cover every file class.
 
-2. Crypto and dependency floor
+## Known Remaining Gaps
 
-`paths.targets` still links `bcrypt.lib`, and `win32iocompat.vcxproj` still
-defines `USE_MSCNG`. CNG is not available on stock Windows XP. A real XP port
-must either:
+- The XP installer/setup flow is still not productionized. This includes
+  service creation, `%ProgramData%\ssh` setup on XP, default config placement,
+  ACL repair, and clear operator-facing scripts.
+- LSA package deployment is not automated for production use. The local-user
+  public-key path has been validated, but install/reboot/rollback handling still
+  needs hardening.
+- Domain-user public-key authentication is not solved.
+- GSSAPI/Kerberos and domain integration are unvalidated.
+- Legacy PTY resize support is disabled or incomplete on XP.
+- Modern Windows features such as ConPTY and newer telemetry are outside the XP
+  runtime surface.
+- The no-OpenSSL build has a reduced crypto/key algorithm surface compared with
+  normal modern Windows builds.
+- Runtime ACL enforcement does not cover `sshd_config` or external subsystem
+  binaries; those remain setup/repair responsibilities unless we deliberately
+  choose to change Windows behavior.
 
-- replace the CNG-dependent code path with CryptoAPI/OpenSSL-based logic, or
-- build a distinct XP profile that disables the MSCNG path entirely
+## Recommended Next Steps
 
-3. ETW / TraceLogging
-
-Parts of the Windows logging stack use ETW and TraceLogging. ETW provider
-registration is a Vista+ feature set. For XP, this likely needs to degrade to
-Event Log only, debug logging only, or a compile-time-disabled telemetry path.
-
-4. Long-path and handle-to-path behavior
-
-The `GetFinalPathNameByHandleW` fallback is best-effort. It is sufficient for
-initial bring-up, but should be tested carefully against:
-
-- local files
-- UNC paths
-- symlinks / reparse points
-- chroot path checks
-- `fdopen()` reopen paths
-
-5. Authentication and service behavior
-
-Modern Windows logon, service hardening, and token-management assumptions need
-validation on XP, especially around:
-
-- service installation and SCM behavior
-- LSA / logon package handling
-- user profile loading
-- password authentication
-- privilege assignment and SID translation
-
-6. Feature scope
-
-Expect some Windows features to remain unavailable on XP even if the port
-starts and accepts connections:
-
-- ConPTY
-- modern telemetry
-- some newer shell-host behavior
-- any functionality that depends on newer system DLL exports
-
-## Reference code
-
-The sibling `../openssh-5.9p1-win32` tree is useful as a reference for older
-Win32 assumptions and XP-era build targets, but it is much older than the
-current Microsoft port. Treat it as a compatibility reference, not as code that
-can be copied forward wholesale.
-
-## Recommended next steps
-
-1. Create a dedicated XP build profile for `Win32`.
-
-Keep `x64` and newer ARM targets on the current toolchain assumptions. XP work
-should be isolated to `Win32` first.
-
-2. Remove or conditionalize the CNG dependency.
-
-This is likely the next largest technical blocker after the basic Win32 API
-surface.
-
-3. Audit ETW / TraceLogging paths.
-
-Decide whether to stub them, disable them, or route them to a legacy logging
-backend when `OpenSSHWinNt == 0x0501`.
-
-4. Compare runtime behavior against the NoMachine 5.9 Win32 tree.
-
-Use the older tree to guide service setup, authentication fallbacks, and any
-XP-specific shell or console behavior that Microsoft’s newer port no longer
-expects.
+1. Keep iterating on the 32-bit MinGW build and test on a real XP target.
+2. Turn the current manual XP service, ProgramData, ACL, and LSA setup steps
+   into repeatable scripts or installer actions.
+3. Add automated regression coverage for XP-relevant SFTP/SCP/subsystem and
+   ACL behavior where it can be tested without a full XP VM.
+4. Decide explicitly whether to preserve upstream Windows ACL semantics for
+   config/application files or add stricter runtime checks for this XP port.
+5. Validate the remaining authentication surface: domain accounts, GSSAPI, and
+   any key algorithms needed beyond the current OpenSSL-less Ed25519 path.
