@@ -913,8 +913,9 @@ DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
 	(void)instance;
 	(void)reserved;
 	if (reason == DLL_PROCESS_ATTACH) {
-		InitializeCriticalSection(&grant_lock);
-		grant_lock_initialized = 1;
+		/* InterlockedCompareExchange guards against concurrent DLL_PROCESS_ATTACH */
+		if (InterlockedCompareExchange((LONG *)&grant_lock_initialized, 1, 0) == 0)
+			InitializeCriticalSection(&grant_lock);
 	} else if (reason == DLL_PROCESS_DETACH && grant_lock_initialized) {
 		for (grant = grants; grant != NULL; grant = next) {
 			next = grant->next;

@@ -292,7 +292,7 @@ HANDLE ux_thread = INVALID_HANDLE_VALUE;
 HANDLE ctrl_thread = INVALID_HANDLE_VALUE;
 HWND child_console_hwnd = NULL;
 
-DWORD child_exit_code = 0;
+volatile DWORD child_exit_code = 0;
 DWORD hostProcessId = 0;
 DWORD hostThreadId = 0;
 DWORD childProcessId = 0;
@@ -920,8 +920,10 @@ SizeWindow(HANDLE hInput)
 unsigned __stdcall
 MonitorChild(_In_ LPVOID lpParameter)
 {
+	DWORD ec = 0;
 	WaitForSingleObject(child, INFINITE);
-	GetExitCodeProcess(child, &child_exit_code);
+	GetExitCodeProcess(child, &ec);
+	InterlockedExchange((LONG *)&child_exit_code, (LONG)ec);
 	PostThreadMessage(hostThreadId, WM_APPEXIT, 0, 0);
 	return 0;
 }

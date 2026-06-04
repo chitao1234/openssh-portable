@@ -148,8 +148,11 @@ w32_kill(int pid, int sig)
 			break;
 		}
 
-	if (child_index != -1)
-		TerminateProcess(children.handles[child_index], 0);
+	if (child_index == -1) {
+		errno = ESRCH;
+		return -1;
+	}
+	TerminateProcess(children.handles[child_index], 0);
 	return 0;
 }
 
@@ -180,7 +183,7 @@ waitpid(int pid, int *status, int options)
 	}
 
 	if (pid > 0) {
-		if (options != 0) {
+		if (options & ~WNOHANG) {
 			errno = ENOTSUP;
 			debug_assert_internal();
 			return -1;
@@ -199,7 +202,13 @@ waitpid(int pid, int *status, int options)
 
 		/* wait if process is still alive */
 		if (index < children.num_children - children.num_zombies) {
-			ret = WaitForSingleObject(process, INFINITE);
+			timeout = (options & WNOHANG) ? 0 : INFINITE;
+			ret = WaitForSingleObject(process, timeout);
+			if (ret == WAIT_TIMEOUT) {
+				if (status)
+					*status = 0;
+				return 0;
+			}
 			if (ret != WAIT_OBJECT_0)
 				debug_assert_internal();//fatal
 		}

@@ -484,11 +484,23 @@ pGetTickCount64(void)
 	if (s_pGetTickCount64 != NULL)
 		return s_pGetTickCount64();
 
-	tick_now = GetTickCount();
-	if (tick_now < s_last_tick)
-		s_tick_base += (1ULL << 32);
-	s_last_tick = tick_now;
-	return s_tick_base + tick_now;
+	{
+		static CRITICAL_SECTION cs;
+		static int cs_init = 0;
+		ULONGLONG result;
+		if (!cs_init) {
+			cs_init = 1;
+			InitializeCriticalSection(&cs);
+		}
+		EnterCriticalSection(&cs);
+		tick_now = GetTickCount();
+		if (tick_now < s_last_tick)
+			s_tick_base += (1ULL << 32);
+		s_last_tick = tick_now;
+		result = s_tick_base + tick_now;
+		LeaveCriticalSection(&cs);
+		return result;
+	}
 }
 
 BOOL

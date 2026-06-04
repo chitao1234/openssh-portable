@@ -114,7 +114,7 @@ int exec_command_with_pty(pid_t * pid, char* cmd, int in, int out, int err, unsi
 	else {
 		/* launch via ssh-shellhost's legacy console bridge */
 		_snwprintf_s(pty_cmdline, MAX_CMD_LEN, MAX_CMD_LEN,
-		    L"\"%ls\\ssh-shellhost.exe\" ---pty-exec %ls", __wprogdir,
+		    L"\"%ls\\ssh-shellhost.exe\" ---pty-exec \"%ls\"", __wprogdir,
 		    cmd_w);
 		si.dwXCountChars = col;
 		si.dwYCountChars = row;
