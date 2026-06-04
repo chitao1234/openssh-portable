@@ -115,6 +115,9 @@ struct w32_io {
 		DWORD error;
 	}sync_write_status;
 	BOOL close_after_read;
+	/* TTY query response from processBuffer, consumed by WriteAPCProc on main thread */
+	const unsigned char *tty_resp_buf;
+	size_t tty_resp_len;
 
 	/*handle specific internal state context, used by sockets and pipes*/
 	struct {

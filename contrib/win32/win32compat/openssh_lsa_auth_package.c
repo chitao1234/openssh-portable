@@ -231,6 +231,8 @@ consume_grant(const wchar_t *user, const wchar_t *domain,
 		if (memcmp(cur->grant, grant_id,
 		    OPENSSH_LSA_AUTH_GRANT_BYTES) != 0)
 			continue;
+		/* grant_id is a 32-byte random token — matching it is sufficient;
+		 * user/domain check prevents one user consuming another's grant */
 		if (_wcsicmp(cur->user, user) == 0 &&
 		    _wcsicmp(cur->domain, domain) == 0)
 			status = STATUS_SUCCESS;

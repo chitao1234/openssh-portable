@@ -282,6 +282,23 @@ WriteAPCProc(_In_ ULONG_PTR dwParam)
 	WaitForSingleObject(pio->write_overlapped.hEvent, INFINITE);
 	CloseHandle(pio->write_overlapped.hEvent);
 	pio->write_overlapped.hEvent = 0;
+
+	/* Inject any TTY query response (e.g. cursor position report) into the read buffer */
+	if (pio->tty_resp_buf != NULL && pio->tty_resp_len > 0 &&
+	    !pio->read_details.pending) {
+		if (pio->read_details.buf_size == 0) {
+			pio->read_details.buf = malloc(pio->tty_resp_len);
+			pio->read_details.buf_size = (DWORD)pio->tty_resp_len;
+		}
+		if (pio->read_details.buf != NULL) {
+			DWORD n = (DWORD)min(pio->tty_resp_len, pio->read_details.buf_size);
+			memcpy(pio->read_details.buf, pio->tty_resp_buf, n);
+			pio->read_details.remaining = n;
+			pio->read_details.completed = 0;
+		}
+		pio->tty_resp_buf = NULL;
+		pio->tty_resp_len = 0;
+	}
 }
 
 
@@ -325,7 +342,10 @@ WriteThread(_In_ LPVOID lpParameter)
 			free(alloc);
 		} else {
 			processBuffer(WINHANDLE(pio), pio->write_details.buf, pio->sync_write_status.to_transfer, &respbuf, &resplen);
-			/* TODO - respbuf is not null in some cases, this needs to be returned back via read stream */
+			if (respbuf != NULL && resplen > 0) {
+				pio->tty_resp_buf = respbuf;
+				pio->tty_resp_len = resplen;
+			}
 		}
 		if (pio->sync_write_status.error == 0)
 			pio->sync_write_status.transferred = pio->sync_write_status.to_transfer;
