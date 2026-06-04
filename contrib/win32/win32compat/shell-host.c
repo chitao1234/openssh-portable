@@ -832,7 +832,7 @@ SendConsoleSnapshot(HANDLE hInput)
 		readRect.Bottom = row;
 
 		ZeroMemory(buffer, width * sizeof(*buffer));
-		if (!ReadConsoleOutput(child_out, buffer, coordBufSize,
+		if (!ReadConsoleOutputW(child_out, buffer, coordBufSize,
 		    coordBufCoord, &readRect))
 			continue;
 
@@ -1104,7 +1104,7 @@ ProcessEvent(void *p)
 		coordBufCoord.Y = 0;
 
 		/* Copy the block from the screen buffer to the temp. buffer */
-		if (!ReadConsoleOutput(child_out, pBuffer, coordBufSize, coordBufCoord, &readRect))
+		if (!ReadConsoleOutputW(child_out, pBuffer, coordBufSize, coordBufCoord, &readRect))
 			return GetLastError();
 
 		/* Set cursor location based on the reported location from the message */
@@ -1141,7 +1141,7 @@ ProcessEvent(void *p)
 		coordBufCoord.Y = 0;
 
 		/* Copy the block from the screen buffer to the temp. buffer */
-		if (!ReadConsoleOutput(child_out, pBuffer, coordBufSize, coordBufCoord, &readRect))
+		if (!ReadConsoleOutputW(child_out, pBuffer, coordBufSize, coordBufCoord, &readRect))
 			return GetLastError();
 
 		SendBuffer(pipe_out, pBuffer, bufferSize);		

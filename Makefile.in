@@ -69,6 +69,7 @@ WIN32_SESSION_OBJS=@WIN32_SESSION_OBJS@
 WIN32_AGENT_OBJS=@WIN32_AGENT_OBJS@
 
 WIN32_SHELLHOST_TARGET=@WIN32_SHELLHOST_TARGET@
+WIN32_SHELLHOST_CPPFLAGS=-DUNICODE -D_UNICODE
 
 WIN32_TTY_OBJS=@WIN32_TTY_OBJS@
 
@@ -289,7 +290,7 @@ win32-utf8.o: $(srcdir)/contrib/win32/win32compat/win32-utf8.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
 shell-host.o: $(srcdir)/contrib/win32/win32compat/shell-host.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(WIN32_SHELLHOST_CPPFLAGS) -c $< -o $@
 
 openssh-lsa-auth.dll: $(srcdir)/contrib/win32/win32compat/openssh_lsa_auth_package.c
 	$(CC) -o $@ -shared $(CFLAGS_NOPIE) $(CPPFLAGS) \
