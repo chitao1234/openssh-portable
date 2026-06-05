@@ -263,6 +263,8 @@ struct key_translation keys[] = {
 
 static SHORT lastX = 0;
 static SHORT lastY = 0;
+static SHORT outputX = -1;
+static SHORT outputY = -1;
 static wchar_t system32_path[PATH_MAX + 1] = { 0, };
 
 SHORT currentLine = 0;
@@ -586,8 +588,10 @@ SendLF(HANDLE hInput)
 {
 	DWORD wr = 0;
 
-	if (bUseAnsiEmulation)
+	if (bUseAnsiEmulation) {
 		WriteFile(hInput, "\n", 1, &wr, NULL);
+		outputX = outputY = -1;
+	}
 }
 
 void 
@@ -595,8 +599,10 @@ SendClearScreen(HANDLE hInput)
 {
 	DWORD wr = 0;
 
-	if (bUseAnsiEmulation)
+	if (bUseAnsiEmulation) {
 		WriteFile(hInput, "\033[2J", 4, &wr, NULL);
+		outputX = outputY = -1;
+	}
 }
 
 void 
@@ -604,8 +610,10 @@ SendClearScreenFromCursor(HANDLE hInput)
 {
 	DWORD wr = 0;
 
-	if (bUseAnsiEmulation)
+	if (bUseAnsiEmulation) {
 		WriteFile(hInput, "\033[1J", 4, &wr, NULL);
+		outputX = outputY = -1;
+	}
 }
 
 void 
@@ -641,10 +649,18 @@ SendSetCursor(HANDLE hInput, int X, int Y)
 	DWORD wr = 0;
 	int out = 0;
 	char formatted_output[255];
+	SHORT x = (SHORT)(X - 1);
+	SHORT y = (SHORT)(Y - 1);
+
+	if (outputX == x && outputY == y)
+		return;
 
 	out = _snprintf_s(formatted_output, sizeof(formatted_output), _TRUNCATE, "\033[%d;%dH", Y, X);
-	if (out > 0 && bUseAnsiEmulation)
+	if (out > 0 && bUseAnsiEmulation) {
 		WriteFile(hInput, formatted_output, out, &wr, NULL);
+		outputX = x;
+		outputY = y;
+	}
 }
 
 void 
@@ -762,6 +778,11 @@ SendCharacter(HANDLE hInput, WORD attributes, wchar_t character)
 
 		if (nSize > 0)
 			WriteFile(hInput, str, nSize, &wr, NULL);
+		if (nSize > 0 && outputX >= 0 && outputY >= 0) {
+			outputX++;
+			if (attributes & COMMON_LVB_LEADING_BYTE)
+				outputX++;
+		}
 	}
 
 	pattributes = attributes;
@@ -1146,29 +1167,20 @@ ProcessEvent(void *p)
 		wAttributes = HIWORD(idChild);
 		wX = LOWORD(idObject);
 		wY = HIWORD(idObject);
-		
-		readRect.Top = wY;
-		readRect.Bottom = wY;
-		readRect.Left = wX;
-		readRect.Right = ConSRWidth();
-		
+
 		/* Set cursor location based on the reported location from the message */
 		CalculateAndSetCursor(pipe_out, wX, wY, TRUE);
-				
-		coordBufSize.Y = readRect.Bottom - readRect.Top + 1;
-		coordBufSize.X = readRect.Right - readRect.Left + 1;
-		bufferSize = coordBufSize.X * coordBufSize.Y;
 
-		/* The top left destination cell of the temporary buffer is row 0, col 0 */
-		coordBufCoord.X = 0;
-		coordBufCoord.Y = 0;
-
-		/* Copy the block from the screen buffer to the temp. buffer */
-		if (!ReadConsoleOutputW(child_out, pBuffer, coordBufSize, coordBufCoord, &readRect))
-			return GetLastError();
-
-		SendBuffer(pipe_out, pBuffer, bufferSize);		
-		lastContentBottom = max(lastContentBottom, readRect.Bottom);
+		/*
+		 * EVENT_CONSOLE_UPDATE_SIMPLE describes one updated cell.  Do
+		 * not reread the whole row here: on XP, cmd.exe reports each
+		 * typed character through this event, so sending the row tail
+		 * produces visible repeated suffixes on the SSH client.
+		 */
+		SendCharacter(pipe_out, wAttributes, chUpdate);
+		if (chUpdate != L'\0' && chUpdate != L' ')
+			bConsoleOutputSeen = TRUE;
+		lastContentBottom = max(lastContentBottom, (SHORT)wY);
 
 		break;
 	}
