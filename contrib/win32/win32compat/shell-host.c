@@ -594,6 +594,19 @@ SendLF(HANDLE hInput)
 	}
 }
 
+void
+SendFinalLineBreak(HANDLE hInput)
+{
+	DWORD wr = 0;
+
+	if (bUseAnsiEmulation && outputX > 0) {
+		WriteFile(hInput, "\r\n", 2, &wr, NULL);
+		outputX = 0;
+		if (outputY >= 0)
+			outputY++;
+	}
+}
+
 void 
 SendClearScreen(HANDLE hInput)
 {
@@ -1436,6 +1449,7 @@ cleanup:
 	/* cleanup */
 	dwStatus = GetLastError();
 	SendConsoleSnapshot(pipe_out, TRUE);
+	SendFinalLineBreak(pipe_out);
 	CloseChildConsoleHandles();
 }
 
