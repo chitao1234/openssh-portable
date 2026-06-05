@@ -266,6 +266,7 @@ static SHORT lastY = 0;
 static wchar_t system32_path[PATH_MAX + 1] = { 0, };
 
 SHORT currentLine = 0;
+SHORT lastContentBottom = -1;
 consoleEvent* head = NULL;
 consoleEvent* tail = NULL;
 
@@ -787,16 +788,17 @@ SendBuffer(HANDLE hInput, CHAR_INFO *buffer, DWORD bufferSize)
 }
 
 void
-SendConsoleSnapshot(HANDLE hInput)
+SendConsoleSnapshot(HANDLE hInput, BOOL final_snapshot)
 {
 	CONSOLE_SCREEN_BUFFER_INFOEX  consoleBufferInfo;
 	CHAR_INFO *buffer = NULL;
 	SMALL_RECT readRect;
 	COORD coordBufSize;
 	COORD coordBufCoord;
-	SHORT row, top, bottom, width, last;
+	SHORT row, top, bottom, width, last, first_row;
 
-	if (bConsoleOutputSeen || child_out == INVALID_HANDLE_VALUE ||
+	if ((!final_snapshot && bConsoleOutputSeen) ||
+	    child_out == INVALID_HANDLE_VALUE ||
 	    child_out == NULL)
 		return;
 
@@ -816,6 +818,22 @@ SendConsoleSnapshot(HANDLE hInput)
 	if (bottom < top)
 		return;
 
+	/*
+	 * A child can exit before XP has delivered the last console update
+	 * event to shellhost.  During final cleanup, reread only the console
+	 * tail that was not already emitted by update events.  If the child
+	 * rewrote the current row, reread that row instead.
+	 */
+	if (final_snapshot && bConsoleOutputSeen && lastContentBottom >= top)
+		first_row = bottom > lastContentBottom ?
+		    lastContentBottom + 1 : lastContentBottom;
+	else
+		first_row = top;
+	if (first_row > bottom)
+		first_row = bottom;
+	if (first_row < top)
+		first_row = top;
+
 	buffer = calloc(width, sizeof(*buffer));
 	if (buffer == NULL)
 		return;
@@ -825,7 +843,7 @@ SendConsoleSnapshot(HANDLE hInput)
 	coordBufCoord.X = 0;
 	coordBufCoord.Y = 0;
 
-	for (row = top; row <= bottom; row++) {
+	for (row = first_row; row <= bottom; row++) {
 		readRect.Left = consoleBufferInfo.srWindow.Left;
 		readRect.Right = consoleBufferInfo.srWindow.Right;
 		readRect.Top = row;
@@ -846,6 +864,7 @@ SendConsoleSnapshot(HANDLE hInput)
 
 		SendSetCursor(hInput, 1, row - top + 1);
 		SendBuffer(hInput, buffer, last + 1);
+		lastContentBottom = row;
 	}
 
 	free(buffer);
@@ -1072,6 +1091,7 @@ ProcessEvent(void *p)
 				SendClearScreen(pipe_out);
 				ViewPortY = 0;
 				lastViewPortY = 0;
+				lastContentBottom = -1;
 
 				return ERROR_SUCCESS;
 			}
@@ -1114,6 +1134,7 @@ ProcessEvent(void *p)
 
 		/* Send the entire block */
 		SendBuffer(pipe_out, pBuffer, bufferSize);
+		lastContentBottom = max(lastContentBottom, readRect.Bottom);
 		lastViewPortY = ViewPortY;
 		lastLineLength = readRect.Left;		
 		
@@ -1147,6 +1168,7 @@ ProcessEvent(void *p)
 			return GetLastError();
 
 		SendBuffer(pipe_out, pBuffer, bufferSize);		
+		lastContentBottom = max(lastContentBottom, readRect.Bottom);
 
 		break;
 	}
@@ -1177,6 +1199,7 @@ ProcessEvent(void *p)
 			savedLastViewPortY = lastViewPortY;
 			ViewPortY = 0;
 			lastViewPortY = 0;;
+			lastContentBottom = -1;
 			bFullScreen = TRUE;
 		} else {
 			/* Leave full screen mode if applicable */
@@ -1184,6 +1207,7 @@ ProcessEvent(void *p)
 				SendClearScreen(pipe_out);
 				ViewPortY = savedViewPortY;
 				lastViewPortY = savedLastViewPortY;
+				lastContentBottom = -1;
 				bFullScreen = FALSE;
 			}
 		}
@@ -1399,7 +1423,7 @@ ProcessMessages(void* p)
 cleanup:
 	/* cleanup */
 	dwStatus = GetLastError();
-	SendConsoleSnapshot(pipe_out);
+	SendConsoleSnapshot(pipe_out, TRUE);
 	CloseChildConsoleHandles();
 }
 
