@@ -99,6 +99,26 @@ extern struct sshauthopt *auth_opts;
 	struct sshbuf *auth_debug;
 #endif
 
+#ifdef WINDOWS
+static void
+free_passwd_copy(struct passwd *pw)
+{
+	if (pw == NULL)
+		return;
+	free(pw->pw_name);
+	free(pw->pw_passwd);
+#ifdef HAVE_STRUCT_PASSWD_PW_GECOS
+	free(pw->pw_gecos);
+#endif
+#ifdef HAVE_STRUCT_PASSWD_PW_CLASS
+	free(pw->pw_class);
+#endif
+	free(pw->pw_dir);
+	free(pw->pw_shell);
+	free(pw);
+}
+#endif /* WINDOWS */
+
 /*
  * Check if the user is allowed to log in via ssh. If user is listed
  * in DenyUsers or one of user's groups is listed in DenyGroups, false
@@ -498,11 +518,15 @@ getpwnamallow(struct ssh *ssh, const char *user)
 
 	ci = server_get_connection_info(ssh, 1, options.use_dns);
 #ifdef WINDOWS
-	/* getpwname - normalizes the incoming user and makes it lowercase
-	/* it must be duped as the server matching routines may use getpwnam() and
-	 * and free the name being assigned to the connection info structure
+	/*
+	 * getpwnam() normalizes the incoming user and makes it lowercase.
+	 * The Windows getpwnam() result is backed by a static passwd object,
+	 * so copy it before Match/allowed-user processing can call getpwnam()
+	 * again and invalidate the fields.
 	 */
 	pw = getpwnam(user);
+	if (pw != NULL)
+		pw = pwcopy(pw);
 	ci->user = pw? xstrdup(pw->pw_name): user;
 	ci->user_invalid = (pw == NULL);
 #else
@@ -538,8 +562,12 @@ getpwnamallow(struct ssh *ssh, const char *user)
 #endif /* SSH_AUDIT_EVENTS */
 		return (NULL);
 	}
-	if (!allowed_user(ssh, pw))
+	if (!allowed_user(ssh, pw)) {
+#ifdef WINDOWS
+		free_passwd_copy(pw);
+#endif
 		return (NULL);
+	}
 #ifdef HAVE_LOGIN_CAP
 	if ((lc = login_getpwclass(pw)) == NULL) {
 		debug("unable to get login class: %s", user);
@@ -571,7 +599,11 @@ getpwnamallow(struct ssh *ssh, const char *user)
 #endif
 #endif
 	if (pw != NULL)
+#ifdef WINDOWS
+		return (pw);
+#else
 		return (pwcopy(pw));
+#endif
 	return (NULL);
 }
 

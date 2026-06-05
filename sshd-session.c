@@ -422,11 +422,38 @@ static void
 send_autxctx_state(Authctxt *auth, int fd)
 {
 	struct sshbuf *m;
+	struct passwd *pw = auth->pw;
 	int r;
 
 	if ((m = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
-	if ((r = sshbuf_put_cstring(m, auth->pw->pw_name)) != 0)
+
+#define PUTPW(b, id) do { \
+		if ((r = sshbuf_put_string(b, &pw->id, sizeof(pw->id))) != 0) \
+			fatal_fr(r, "assemble %s", #id); \
+	} while (0)
+
+	PUTPW(m, pw_uid);
+	PUTPW(m, pw_gid);
+#ifdef HAVE_STRUCT_PASSWD_PW_CHANGE
+	PUTPW(m, pw_change);
+#endif
+#ifdef HAVE_STRUCT_PASSWD_PW_EXPIRE
+	PUTPW(m, pw_expire);
+#endif
+#undef PUTPW
+
+	if ((r = sshbuf_put_cstring(m, pw->pw_name)) != 0 ||
+	    (r = sshbuf_put_cstring(m, pw->pw_passwd == NULL ?
+	    "*" : pw->pw_passwd)) != 0 ||
+#ifdef HAVE_STRUCT_PASSWD_PW_GECOS
+	    (r = sshbuf_put_cstring(m, pw->pw_gecos)) != 0 ||
+#endif
+#ifdef HAVE_STRUCT_PASSWD_PW_CLASS
+	    (r = sshbuf_put_cstring(m, pw->pw_class)) != 0 ||
+#endif
+	    (r = sshbuf_put_cstring(m, pw->pw_dir)) != 0 ||
+	    (r = sshbuf_put_cstring(m, pw->pw_shell)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	if (ssh_msg_send(fd, 0, m) == -1)
@@ -439,9 +466,10 @@ static void
 recv_autxctx_state(Authctxt *auth, int fd)
 {
 	struct sshbuf *m;
+	struct passwd *pw;
+	const u_char *p;
+	size_t len;
 	u_char ver;
-	const u_char *user;
-	size_t user_len;
 	int r;
 
 	debug3("%s: entering fd = %d", __func__, fd);
@@ -454,9 +482,40 @@ recv_autxctx_state(Authctxt *auth, int fd)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (ver != 0)
 		fatal("%s: rexec version mismatch", __func__);
-	if ((r = sshbuf_get_string_direct(m, &user, &user_len)) != 0)
+
+	pw = xcalloc(1, sizeof(*pw));
+
+#define GETPW(b, id) do { \
+		if ((r = sshbuf_get_string_direct(b, &p, &len)) != 0) \
+			fatal_fr(r, "parse pw %s", #id); \
+		if (len != sizeof(pw->id)) \
+			fatal_fr(r, "bad length for %s", #id); \
+		memcpy(&pw->id, p, len); \
+	} while (0)
+
+	GETPW(m, pw_uid);
+	GETPW(m, pw_gid);
+#ifdef HAVE_STRUCT_PASSWD_PW_CHANGE
+	GETPW(m, pw_change);
+#endif
+#ifdef HAVE_STRUCT_PASSWD_PW_EXPIRE
+	GETPW(m, pw_expire);
+#endif
+#undef GETPW
+
+	if ((r = sshbuf_get_cstring(m, &pw->pw_name, NULL)) != 0 ||
+	    (r = sshbuf_get_cstring(m, &pw->pw_passwd, NULL)) != 0 ||
+#ifdef HAVE_STRUCT_PASSWD_PW_GECOS
+	    (r = sshbuf_get_cstring(m, &pw->pw_gecos, NULL)) != 0 ||
+#endif
+#ifdef HAVE_STRUCT_PASSWD_PW_CLASS
+	    (r = sshbuf_get_cstring(m, &pw->pw_class, NULL)) != 0 ||
+#endif
+	    (r = sshbuf_get_cstring(m, &pw->pw_dir, NULL)) != 0 ||
+	    (r = sshbuf_get_cstring(m, &pw->pw_shell, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	auth->user = xstrdup((const char *)user);
+	auth->pw = pw;
+	auth->user = xstrdup(pw->pw_name);
 
 	debug3("%s: done", __func__);
 	sshbuf_free(m);
@@ -685,7 +744,6 @@ privsep_preauth(struct ssh *ssh)
 	if (privsep_auth_child) {
 		Authctxt *authctxt = ssh->authctxt;
 		recv_autxctx_state(authctxt, PRIVSEP_MONITOR_FD);
-		authctxt->pw = getpwnamallow(ssh, authctxt->user);
 		authctxt->valid = 1;
 		return 1;
 	}
